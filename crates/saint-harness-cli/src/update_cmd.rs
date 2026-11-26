@@ -271,54 +271,62 @@ fn extract_binary(archive_path: &Path, dest_dir: &Path) -> Result<PathBuf, Strin
         "saint-harness"
     };
 
+    let extract_dir = dest_dir.join("extracted");
+    let _ = fs::remove_dir_all(&extract_dir);
+
+    let tool_stderr: String;
     if fname.ends_with(".tar.gz") || fname.ends_with(".tgz") {
+        fs::create_dir_all(&extract_dir).map_err(|e| e.to_string())?;
         let out = Command::new("tar")
             .arg("-xzf")
             .arg(archive_path)
             .arg("-C")
-            .arg(dest_dir)
+            .arg(&extract_dir)
             .output()
             .map_err(|e| format!("failed to run tar: {e}"))?;
+        tool_stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
         if !out.status.success() {
-            return Err(format!(
-                "tar extraction failed: {}",
-                String::from_utf8_lossy(&out.stderr)
-            ));
+            return Err(format!("tar extraction failed: {tool_stderr}"));
         }
     } else if fname.ends_with(".zip") {
         #[cfg(windows)]
         let out = Command::new("powershell")
             .args([
                 "-NoProfile",
+                "-NonInteractive",
                 "-Command",
-                &format!(
-                    "Expand-Archive -Path '{}' -DestinationPath '{}' -Force",
-                    archive_path.display(),
-                    dest_dir.display()
-                ),
+                "$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; [System.IO.Compression.ZipFile]::ExtractToDirectory($env:SH_ARCHIVE, $env:SH_DEST)",
             ])
+            .env("SH_ARCHIVE", archive_path)
+            .env("SH_DEST", &extract_dir)
             .output()
-            .map_err(|e| format!("failed to run PowerShell Expand-Archive: {e}"))?;
+            .map_err(|e| format!("failed to run PowerShell ZipFile extraction: {e}"))?;
         #[cfg(not(windows))]
-        let out = Command::new("unzip")
-            .arg("-o")
-            .arg(archive_path)
-            .arg("-d")
-            .arg(dest_dir)
-            .output()
-            .map_err(|e| format!("failed to run unzip: {e}"))?;
+        let out = {
+            fs::create_dir_all(&extract_dir).map_err(|e| e.to_string())?;
+            Command::new("unzip")
+                .arg("-o")
+                .arg(archive_path)
+                .arg("-d")
+                .arg(&extract_dir)
+                .output()
+                .map_err(|e| format!("failed to run unzip: {e}"))?
+        };
+        tool_stderr = String::from_utf8_lossy(&out.stderr).trim().to_string();
         if !out.status.success() {
-            return Err(format!(
-                "zip extraction failed: {}",
-                String::from_utf8_lossy(&out.stderr)
-            ));
+            return Err(format!("zip extraction failed: {tool_stderr}"));
         }
     } else {
         return Err(format!("unsupported release archive format: {fname}"));
     }
 
-    find_file_recursive(dest_dir, bin_name)
-        .ok_or_else(|| format!("extracted archive did not contain `{bin_name}`"))
+    find_file_recursive(&extract_dir, bin_name).ok_or_else(|| {
+        if tool_stderr.is_empty() {
+            format!("extracted archive did not contain `{bin_name}`")
+        } else {
+            format!("extracted archive did not contain `{bin_name}` (stderr: {tool_stderr})")
+        }
+    })
 }
 
 fn find_file_recursive(dir: &Path, target_name: &str) -> Option<PathBuf> {

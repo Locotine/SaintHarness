@@ -398,19 +398,22 @@ async fn cli_doctor_and_self_update_e2e_verifies_sha256_and_replaces_binary() {
     }
     #[cfg(windows)]
     {
-        let st = Command::new("powershell")
+        let out = Command::new("powershell")
             .args([
                 "-NoProfile",
+                "-NonInteractive",
                 "-Command",
-                &format!(
-                    "Compress-Archive -Path '{}' -DestinationPath '{}' -Force",
-                    staged_bin.display(),
-                    archive_path.display()
-                ),
+                "$ErrorActionPreference = 'Stop'; Add-Type -AssemblyName System.IO.Compression.FileSystem; if (Test-Path -LiteralPath $env:SH_ZIP) { Remove-Item -Force -LiteralPath $env:SH_ZIP }; [System.IO.Compression.ZipFile]::CreateFromDirectory($env:SH_SRC, $env:SH_ZIP)",
             ])
-            .status()
+            .env("SH_SRC", &stage)
+            .env("SH_ZIP", &archive_path)
+            .output()
             .unwrap();
-        assert!(st.success());
+        assert!(
+            out.status.success(),
+            "zip creation failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
     }
 
     let archive_bytes = std::fs::read(&archive_path).unwrap();

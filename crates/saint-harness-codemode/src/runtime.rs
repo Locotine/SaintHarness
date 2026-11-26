@@ -37,19 +37,28 @@ impl ScriptHost for QuickJsScriptHost {
         let code = code.to_string();
         let mem_limit = self.memory_limit_bytes;
         let rt_handle = tokio::runtime::Handle::current();
+        let (tx, rx) = tokio::sync::oneshot::channel();
 
-        tokio::task::spawn_blocking(move || {
-            run_quickjs_sync(
-                &code,
-                timeout_ms,
-                max_tool_calls,
-                mem_limit,
-                invoker,
-                rt_handle,
-            )
-        })
-        .await
-        .map_err(|e| format!("quickjs worker join failed: {e}"))?
+        // Spawn a dedicated OS thread with an explicit 4 MiB stack so QuickJS never
+        // collides with smaller platform worker defaults (e.g. 512 KiB pthreads on macOS).
+        std::thread::Builder::new()
+            .name("sh-quickjs".to_string())
+            .stack_size(4 * 1024 * 1024)
+            .spawn(move || {
+                let res = run_quickjs_sync(
+                    &code,
+                    timeout_ms,
+                    max_tool_calls,
+                    mem_limit,
+                    invoker,
+                    rt_handle,
+                );
+                let _ = tx.send(res);
+            })
+            .map_err(|e| format!("failed to spawn quickjs worker thread: {e}"))?;
+
+        rx.await
+            .map_err(|e| format!("quickjs worker channel failed: {e}"))?
     }
 }
 
@@ -63,7 +72,10 @@ fn run_quickjs_sync(
 ) -> Result<ScriptResult, String> {
     let runtime = Runtime::new().map_err(|e| format!("quickjs runtime init failed: {e}"))?;
     runtime.set_memory_limit(memory_limit_bytes);
-    runtime.set_max_stack_size(1024 * 1024);
+    if memory_limit_bytes > 0 {
+        runtime.set_gc_threshold(memory_limit_bytes / 2);
+    }
+    runtime.set_max_stack_size(256 * 1024);
 
     let interrupted = Arc::new(AtomicBool::new(false));
     let intr_check = interrupted.clone();
@@ -163,6 +175,11 @@ const tools = new Proxy({
     });
 
     timer_done.store(true, Ordering::Relaxed);
+    runtime.set_interrupt_handler(None);
+    runtime.set_memory_limit(0);
+    drop(ctx);
+    drop(runtime);
+
     let raw_out = eval_res?;
     let output: Value = serde_json::from_str(&raw_out).unwrap_or(Value::String(raw_out));
     let collected_logs = logs.lock().map(|g| g.clone()).unwrap_or_default();
@@ -189,7 +206,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn executes_js_with_tools_proxy_blocks_infinite_loop_and_oom() {
+    async fn executes_js_with_tools_proxy() {
         let host = QuickJsScriptHost::default();
         let res = host
             .execute_script(
@@ -206,15 +223,21 @@ mod tests {
             .unwrap();
         assert_eq!(res.output, json!(["a.rs", "b.rs"]));
         assert_eq!(res.tool_calls_made, 1);
+    }
 
-        // Infinite loop interrupted cleanly by timeout
+    #[tokio::test]
+    async fn blocks_infinite_loop_with_timeout() {
+        let host = QuickJsScriptHost::default();
         let loop_err = host
             .execute_script("while(true) {}", 250, 10, Arc::new(FakeInvoker))
             .await
             .unwrap_err();
         assert!(loop_err.contains("interrupted") || loop_err.contains("execution error"));
+    }
 
-        // OOM allocation blocked at 64 MiB cap
+    #[tokio::test]
+    async fn blocks_oom_at_memory_limit() {
+        let host = QuickJsScriptHost::default();
         let oom_err = host
             .execute_script(
                 "const a = []; for (let i = 0; i < 10000000; i++) { a.push('xxxxxxxxxx'.repeat(100)); } return a.length;",

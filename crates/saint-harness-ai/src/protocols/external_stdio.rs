@@ -41,12 +41,13 @@ impl WireProtocol for ExternalStdioProtocol {
             let line = serde_json::to_string(&request).map_err(|e| AiError::InvalidRequest {
                 message: e.to_string(),
             })?;
-            stdin
-                .write_all(format!("{line}\n").as_bytes())
-                .await
-                .map_err(|e| AiError::InvalidRequest {
+            if let Err(e) = stdin.write_all(format!("{line}\n").as_bytes()).await
+                && e.kind() != std::io::ErrorKind::BrokenPipe
+            {
+                return Err(AiError::InvalidRequest {
                     message: e.to_string(),
-                })?;
+                });
+            }
             let _ = stdin.shutdown().await;
         }
 
@@ -114,7 +115,15 @@ mod tests {
         let fixture = tmp.path().join("events.jsonl");
         std::fs::write(&fixture, format!("{ev1}\n{ev2}\n")).unwrap();
         #[cfg(unix)]
-        let proto = ExternalStdioProtocol::new("cat", vec![fixture.to_string_lossy().into_owned()]);
+        let proto = ExternalStdioProtocol::new(
+            "sh",
+            vec![
+                "-c".into(),
+                "IFS= read -r _req && cat \"$1\"".into(),
+                "_".into(),
+                fixture.to_string_lossy().into_owned(),
+            ],
+        );
         #[cfg(windows)]
         let proto = ExternalStdioProtocol::new(
             "cmd.exe",

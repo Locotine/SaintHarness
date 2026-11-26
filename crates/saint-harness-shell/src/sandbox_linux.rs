@@ -1,5 +1,7 @@
 use saint_harness_schema::SandboxProfile;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(target_os = "linux")]
+use std::path::PathBuf;
 
 #[cfg(target_os = "linux")]
 use landlock::{

@@ -100,7 +100,7 @@ lsp-types = "0.97"
 portable-pty = "0.8"
 landlock = "0.4"
 nix = { version = "0.29", features = ["signal", "process"] }
-rquickjs = { version = "0.9", features = ["futures", "macro", "parallel"] }
+rquickjs = { version = "0.14", features = ["futures", "macro", "parallel"] }
 axum = { version = "0.8", features = ["macros"] }
 ratatui = "0.29"
 crossterm = "0.28"
