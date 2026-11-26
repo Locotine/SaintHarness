@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PATH="$HOME/.cargo/bin:$PATH"
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+echo "[pre-commit] Running SaintHarness gates (cleanroom + firewall + 100% UI prototype parity)..."
+./scripts/check-cleanroom.sh
+./scripts/check-firewall.sh
+./scripts/check-prototype-parity.sh
+echo "[pre-commit] All gates passed."

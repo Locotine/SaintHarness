@@ -1,0 +1,53 @@
+# profiles/qwen-4-upcoming.toml
+[model]
+provider = "qwen"
+selector = "latest_family:qwen4"
+env_override = "SAINT_HARNESS_QWEN4_MODEL"
+route = "qwen_dashscope"
+protocol = "openai_chat_compat"
+prompt_tune_file = "prompts/qwen-4.txt"
+prompt_tune_mode = "append"
+
+[context]
+native_window = "auto"
+effective_window = "auto"
+soft_shake_ratio = 0.60
+keep_recent_tokens = 20000
+max_output_tokens = "auto"
+
+[reasoning]
+mode = "enabled"
+preserve_thinking = true
+thinking_entrapment_guard = true
+smol_disables_thinking = true
+
+[tools]
+edit_mode = "hashline"
+diff_engine = "imara_histogram"
+ast_edit = true
+read_outline_threshold_lines = 200
+delta_reread = true
+repomap_budget_tokens = 2000
+observation_masking_window = 10
+fast_lint = ["oxc", "ruff"]
+git_engine = "gix"
+ts_plugin_strip = "oxc"
+tantivy_threshold_files = 10000
+max_direct_tools = 10
+wire_xml_fallback = false
+json_repair = true
+policy_guard = "noop"
+
+[cache]
+policy = "qwen_system_tail"
+ttl_seconds = 300
+allow_snapcompact = false
+
+[sampling]
+temperature = 0.6
+top_p = 0.95
+presence_penalty = 0.0
+
+[limits]
+doom_loop_repeat = 3
+max_concurrent_subagents = 4

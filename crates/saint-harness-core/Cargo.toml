@@ -1,0 +1,43 @@
+[package]
+name = "saint-harness-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["git-native"]
+git-native = ["dep:gix"]
+
+[dependencies]
+async-trait.workspace = true
+base64.workspace = true
+blake3.workspace = true
+chrono.workspace = true
+dashmap.workspace = true
+futures.workspace = true
+gix = { workspace = true, optional = true }
+globset.workspace = true
+grep-regex.workspace = true
+grep-searcher.workspace = true
+ignore.workspace = true
+imara-diff.workspace = true
+memchr.workspace = true
+nucleo-matcher.workspace = true
+rusqlite.workspace = true
+saint-harness-ai.workspace = true
+saint-harness-schema.workspace = true
+saint-harness-token.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+ulid.workspace = true
+zstd.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

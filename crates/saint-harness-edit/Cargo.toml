@@ -1,0 +1,32 @@
+[package]
+name = "saint-harness-edit"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["ast-edit"]
+ast-edit = ["dep:ast-grep-core", "dep:tree-sitter", "dep:tree-sitter-rust", "dep:tree-sitter-typescript", "dep:tree-sitter-javascript", "dep:tree-sitter-python", "dep:tree-sitter-go"]
+
+[dependencies]
+ast-grep-core = { workspace = true, optional = true }
+async-trait.workspace = true
+blake3.workspace = true
+dashmap.workspace = true
+imara-diff.workspace = true
+regex.workspace = true
+saint-harness-schema.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+tokio.workspace = true
+tree-sitter = { workspace = true, optional = true }
+tree-sitter-go = { workspace = true, optional = true }
+tree-sitter-javascript = { workspace = true, optional = true }
+tree-sitter-python = { workspace = true, optional = true }
+tree-sitter-rust = { workspace = true, optional = true }
+tree-sitter-typescript = { workspace = true, optional = true }

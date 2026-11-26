@@ -1,0 +1,12 @@
+/target
+**/*.rs.bk
+*.pdb
+.DS_Store
+.saint-harness/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.out.zst
+Cargo.lock.bak
+__pycache__/
+*.py[cod]

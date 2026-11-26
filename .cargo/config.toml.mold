@@ -1,0 +1,5 @@
+# Optional fast linker config for machines with clang + mold installed.
+# Copy to .cargo/config.toml to enable ~0.4-0.8s incremental links on Linux.
+[target.x86_64-unknown-linux-gnu]
+linker = "clang"
+rustflags = ["-C", "link-arg=-fuse-ld=mold"]

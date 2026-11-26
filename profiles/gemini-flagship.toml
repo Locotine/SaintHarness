@@ -1,0 +1,46 @@
+# profiles/gemini-flagship.toml
+[model]
+provider = "google"
+selector = "latest_flagship"
+env_override = "SAINT_HARNESS_GEMINI_MODEL"
+route = "google_ai_studio"
+protocol = "gemini_generate_content"
+prompt_tune_file = "prompts/gemini.txt"
+prompt_tune_mode = "append"
+
+[context]
+native_window = "auto"
+effective_window = "auto"
+soft_shake_ratio = 0.55
+keep_recent_tokens = 20000
+max_output_tokens = "auto"
+
+[reasoning]
+mode = "auto"
+preserve_thought_signature = true
+unsigned_tool_sentinel = "skip_thought_signature_validator"
+
+[tools]
+edit_mode = "hashline"
+diff_engine = "imara_histogram"
+ast_edit = true
+read_outline_threshold_lines = 220
+delta_reread = true
+repomap_budget_tokens = 2000
+observation_masking_window = 10
+fast_lint = ["oxc", "ruff"]
+git_engine = "gix"
+ts_plugin_strip = "oxc"
+tantivy_threshold_files = 10000
+strict_schema_sanitizer = true
+separate_user_turn_after_fn_resp = true
+safety_settings = "BLOCK_NONE"
+policy_guard = "noop"
+
+[cache]
+policy = "gemini_implicit"
+ttl_seconds = 300
+
+[limits]
+doom_loop_repeat = 3
+max_concurrent_subagents = 6

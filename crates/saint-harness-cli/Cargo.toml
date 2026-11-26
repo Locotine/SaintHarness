@@ -1,0 +1,51 @@
+[package]
+name = "saint-harness-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "saint-harness"
+path = "src/main.rs"
+
+[features]
+default = ["lang-core", "embedded-server", "tui"]
+lang-core = ["saint-harness-server?/lang-core"]
+lang-all = ["saint-harness-server?/lang-all"]
+embedded-server = [
+  "dep:saint-harness-server",
+  "dep:saint-harness-core",
+  "dep:saint-harness-ai",
+]
+tui = ["dep:saint-harness-tui"]
+fast-lint = ["saint-harness-server?/fast-lint"]
+ts-plugins = ["saint-harness-server?/ts-plugins"]
+monorepo-index = ["saint-harness-server?/monorepo-index"]
+snapcompact = ["saint-harness-server?/snapcompact"]
+acp = ["embedded-server", "dep:saint-harness-acp"]
+full = ["default", "fast-lint", "ts-plugins", "monorepo-index", "snapcompact", "acp"]
+
+[dependencies]
+clap.workspace = true
+crossterm.workspace = true
+reqwest.workspace = true
+saint-harness-acp = { workspace = true, optional = true }
+saint-harness-ai = { workspace = true, optional = true }
+saint-harness-core = { workspace = true, optional = true }
+saint-harness-protocol.workspace = true
+saint-harness-schema.workspace = true
+saint-harness-server = { workspace = true, optional = true }
+saint-harness-tui = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+[dev-dependencies]
+axum.workspace = true
+tempfile.workspace = true

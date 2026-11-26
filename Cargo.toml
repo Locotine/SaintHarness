@@ -1,0 +1,117 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/saint-harness-schema",
+  "crates/saint-harness-ai",
+  "crates/saint-harness-token",
+  "crates/saint-harness-edit",
+  "crates/saint-harness-treesitter",
+  "crates/saint-harness-lsp",
+  "crates/saint-harness-index",
+  "crates/saint-harness-shell",
+  "crates/saint-harness-codemode",
+  "crates/saint-harness-core",
+  "crates/saint-harness-protocol",
+  "crates/saint-harness-server",
+  "crates/saint-harness-tui",
+  "crates/saint-harness-acp",
+  "crates/saint-harness-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+todo = "warn"
+dbg_macro = "deny"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[workspace.dependencies]
+saint-harness-schema = { path = "crates/saint-harness-schema" }
+saint-harness-ai = { path = "crates/saint-harness-ai" }
+saint-harness-token = { path = "crates/saint-harness-token" }
+saint-harness-edit = { path = "crates/saint-harness-edit" }
+saint-harness-treesitter = { path = "crates/saint-harness-treesitter" }
+saint-harness-lsp = { path = "crates/saint-harness-lsp" }
+saint-harness-index = { path = "crates/saint-harness-index" }
+saint-harness-shell = { path = "crates/saint-harness-shell" }
+saint-harness-codemode = { path = "crates/saint-harness-codemode" }
+saint-harness-core = { path = "crates/saint-harness-core" }
+saint-harness-protocol = { path = "crates/saint-harness-protocol" }
+saint-harness-server = { path = "crates/saint-harness-server" }
+saint-harness-tui = { path = "crates/saint-harness-tui" }
+saint-harness-acp = { path = "crates/saint-harness-acp" }
+
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+futures = "0.3"
+async-trait = "0.1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream", "gzip"] }
+eventsource-stream = "0.2"
+rusqlite = { version = "0.32", features = ["bundled", "modern_sqlite"] }
+serde = { version = "1", features = ["derive"] }
+# Intentionally WITHOUT preserve_order so serde_json::Map uses BTreeMap for byte-exact prompt prefix determinism.
+serde_json = "1"
+serde_yaml = "0.9"
+toml = "0.8"
+thiserror = "2"
+blake3 = "1.5"
+sha2 = "0.10"
+ulid = { version = "1", features = ["serde"] }
+dashmap = "6"
+imara-diff = "0.2"
+nucleo-matcher = "0.3"
+unicode-segmentation = "1.12"
+unicode-width = "0.2"
+regex = "1"
+memchr = "2"
+zstd = "0.13"
+strip-ansi-escapes = "0.2"
+tiktoken-rs = "0.6"
+ignore = "0.4"
+grep-searcher = "0.1"
+grep-regex = "0.1"
+globset = "0.4"
+chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }
+base64 = "0.22"
+url = "2"
+tempfile = "3"
+tree-sitter = "0.24"
+tree-sitter-rust = "0.23"
+tree-sitter-typescript = "0.23"
+tree-sitter-javascript = "0.23"
+tree-sitter-python = "0.23"
+tree-sitter-go = "0.23"
+tree-sitter-json = "0.24"
+tree-sitter-toml-ng = "0.7"
+ast-grep-core = "0.36"
+lsp-types = "0.97"
+portable-pty = "0.8"
+landlock = "0.4"
+nix = { version = "0.29", features = ["signal", "process"] }
+rquickjs = { version = "0.9", features = ["futures", "macro", "parallel"] }
+axum = { version = "0.8", features = ["macros"] }
+ratatui = "0.29"
+crossterm = "0.28"
+clap = { version = "4", features = ["derive", "env"] }
+gix = { version = "0.70", default-features = false, features = ["max-performance-safe", "status", "revision", "blob-diff"] }
+tantivy = "0.22"
+oxc_allocator = "0.160"
+oxc_codegen = "0.160"
+oxc_parser = "0.160"
+oxc_semantic = "0.160"
+oxc_span = "0.160"
+oxc_transformer = "0.160"
+tiny-skia = "0.11"
+png = "0.17"

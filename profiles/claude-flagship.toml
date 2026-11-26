@@ -1,0 +1,48 @@
+# profiles/claude-flagship.toml
+[model]
+provider = "anthropic"
+selector = "latest_flagship"
+env_override = "SAINT_HARNESS_CLAUDE_MODEL"
+route = "anthropic_direct"
+protocol = "anthropic_messages"
+prompt_tune_file = "prompts/claude.txt"
+prompt_tune_mode = "append"
+
+[context]
+native_window = "auto"
+effective_window = "auto"
+soft_shake_ratio = 0.65
+keep_recent_tokens = 18000
+max_output_tokens = "auto"
+
+[reasoning]
+mode = "auto"
+effort = "high"
+display = "summarized"
+prefix_mismatch_behavior = "drop_block"
+
+[tools]
+edit_mode = "str_replace"
+diff_engine = "imara_histogram"
+ast_edit = true
+read_outline_threshold_lines = 220
+delta_reread = true
+repomap_budget_tokens = 2000
+observation_masking_window = 10
+fast_lint = ["oxc", "ruff"]
+git_engine = "gix"
+ts_plugin_strip = "oxc"
+tantivy_threshold_files = 10000
+defer_loading = true
+clear_tool_uses_server = true
+max_direct_tools = 12
+policy_guard = "noop"
+
+[cache]
+policy = "anthropic_inline4"
+ttl_seconds = 300
+strict_warm_prune_guard = true
+
+[limits]
+doom_loop_repeat = 3
+max_concurrent_subagents = 6

@@ -1,0 +1,52 @@
+# profiles/qwen-3.8-27b.toml
+[model]
+provider = "qwen"
+selector = "exact:qwen3.8-27b"
+env_override = "SAINT_HARNESS_QWEN38_MODEL"
+route = "qwen_local_sglang"
+protocol = "openai_chat_compat"
+prompt_tune_file = "prompts/qwen-3.8.txt"
+prompt_tune_mode = "append"
+
+[context]
+native_window = 262144
+effective_window = 110000
+soft_shake_tokens = 62000
+keep_recent_tokens = 16000
+max_output_tokens = 16384
+
+[reasoning]
+mode = "enabled"
+preserve_thinking = true
+thinking_entrapment_guard = true
+smol_disables_thinking = true
+
+[tools]
+edit_mode = "hashline"
+diff_engine = "imara_histogram"
+ast_edit = true
+read_outline_threshold_lines = 120
+delta_reread = true
+repomap_budget_tokens = 1500
+observation_masking_window = 8
+fast_lint = ["oxc", "ruff"]
+git_engine = "gix"
+ts_plugin_strip = "oxc"
+tantivy_threshold_files = 10000
+max_direct_tools = 8
+wire_xml_fallback = true
+json_repair = true
+policy_guard = "noop"
+
+[cache]
+policy = "implicit_prefix"
+ttl_seconds = 300
+
+[sampling]
+temperature = 0.65
+top_p = 0.95
+presence_penalty = 0.1
+
+[limits]
+doom_loop_repeat = 3
+max_concurrent_subagents = 2

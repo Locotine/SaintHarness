@@ -1,0 +1,27 @@
+Summarize the conversation state into a structured handoff document for continuing the task cleanly.
+If a previous compaction summary exists, merge and update it in place so completed facts are preserved and obsolete attempts are pruned.
+
+Output MUST include all 7 exact markdown headings below in order:
+
+## 1. Objective & Acceptance Criteria
+State the user's goal, active constraints, and definition of done.
+
+## 2. Workspace State & Modified Files
+List every edited, created, or reverted file path with a brief note of what changed.
+
+## 3. Verified Facts & Architecture Decisions
+Record confirmed technical facts, API contracts, invariants, and choices already settled.
+
+## 4. Test & Verification Results
+List commands executed, pass/fail status, and any remaining errors verbatim.
+
+## 5. Pending Work & Next Concrete Step
+Specify the exact next action to execute immediately after compaction.
+
+## 6. Open Questions, Risks & User Preferences
+Note unresolved decisions, explicit user declines, runtime mode, or constraints.
+
+## 7. Active Subagents & Background Work
+Summarize running or completed background shell jobs and subagent outcomes if present.
+
+Keep the summary factual, dense, and free of redundant raw logs.

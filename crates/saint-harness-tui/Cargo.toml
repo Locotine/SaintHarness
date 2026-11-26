@@ -1,0 +1,21 @@
+[package]
+name = "saint-harness-tui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+crossterm.workspace = true
+eventsource-stream.workspace = true
+futures.workspace = true
+ratatui.workspace = true
+reqwest.workspace = true
+saint-harness-protocol.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+unicode-width.workspace = true

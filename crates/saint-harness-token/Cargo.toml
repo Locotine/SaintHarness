@@ -1,0 +1,30 @@
+[package]
+name = "saint-harness-token"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+snapcompact = ["dep:tiny-skia", "dep:png"]
+
+[dependencies]
+chrono.workspace = true
+png = { workspace = true, optional = true }
+regex.workspace = true
+saint-harness-schema.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+strip-ansi-escapes.workspace = true
+tiktoken-rs.workspace = true
+tiny-skia = { workspace = true, optional = true }
+unicode-segmentation.workspace = true
+zstd.workspace = true
+
+[dev-dependencies]
+blake3.workspace = true
+tempfile.workspace = true

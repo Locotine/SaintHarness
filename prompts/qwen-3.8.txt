@@ -1,0 +1,6 @@
+Tool call discipline:
+- Emit structured JSON tool calls directly outside thinking blocks. Never leave tool invocations inside reasoning text.
+- Prefer `hashline` edits referencing exact `line#HASH` anchors from `read` output; batch non-overlapping edits on the same file in a single call.
+- Use `repo_map` first on unfamiliar codebases before opening individual files.
+- Keep shell commands focused and non-interactive; check exit codes and error diagnostics before retrying.
+- If a tool call fails twice with the same arguments, stop and inspect the underlying file or error rather than repeating it.

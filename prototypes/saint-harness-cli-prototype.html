@@ -1,0 +1,2672 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SaintHarness CLI prototype</title>
+  <style>
+    /* =========================================================================
+       SAINT HYPER AGENT DESIGN SYSTEM (preset: "saint") × QUIET DEVELOPER CHROME
+       Typography: macOS-native OS font reference (100% legal; OFL 1.1 fallbacks)
+       Principle:  progressive disclosure, calm by default, full depth on demand
+
+       Design Read: agent workspace for developers, in Saint Hyper Agent's quiet
+       chrome language, dial ENERGY 1 / RHYTHM 1 / MOTION 1.
+       - Color: SHA tokens. Status hues stay as fills (dots, diff bars); text
+         uses the *-ink variants so every label clears WCAG AA in both themes,
+         mirroring SHA's own --success-foreground / --muted-foreground split.
+       - Type: SHA UI sans for prose, mono for paths, commands, and numbers,
+         because those are what the developer scans and copies.
+       - Accent: Saint Ember marks the current selection, file links, and the
+         logo crown only.
+       - Motion: state transitions under 200ms; the landing wave settles after
+         5s; nothing moves under prefers-reduced-motion.
+       ========================================================================= */
+    :root {
+      color-scheme: light;
+      --surface: #ffffff;
+      --surface-under: #f6f6f6;
+      --sidebar-bg: #fafafa;
+      --panel: #f8f8f8;
+      --control-bg: #f3f3f3;
+      --elevated-bg: #ffffff;
+      --user-bubble: rgba(13, 13, 13, 0.04);
+      --ink: #0d0d0d;
+      --ink-secondary: rgba(13, 13, 13, 0.62);
+      /* SHA --muted-foreground: neutral-500 mixed 90% with black (5.0:1+ on every light surface) */
+      --ink-tertiary: #686868;
+      --border: rgba(13, 13, 13, 0.085);
+      --border-heavy: rgba(13, 13, 13, 0.14);
+      --divider: rgba(13, 13, 13, 0.065);
+      --accent: #c74614;
+      /* SHA light text-accent is #c74614 (4.29:1 on tinted rows); one step darker clears AA. Fills keep --accent. */
+      --text-accent: #b83f10;
+      --accent-bg: rgba(199, 70, 20, 0.09);
+      --accent-border: rgba(199, 70, 20, 0.42);
+      --full-access: #e25505;
+      --status-done: #00a240;
+      --status-blocked: #d97706;
+      --status-working: #751ed9;
+      --status-error: #e02e2a;
+      /* Text-safe status inks (SHA *-foreground pattern: emerald-700, amber-700) */
+      --status-done-ink: #046c4e;
+      --status-working-ink: #751ed9;
+      --status-blocked-ink: #b45309;
+      --status-error-ink: #c62521;
+      --full-access-ink: #a33a03;
+      --diff-added-bg: rgba(0, 162, 64, 0.12);
+      --diff-removed-bg: rgba(224, 46, 42, 0.11);
+      --btn-hover: rgba(13, 13, 13, 0.055);
+      --btn-active: rgba(13, 13, 13, 0.085);
+      --btn-primary-bg: #0d0d0d;
+      --btn-primary-ink: #ffffff;
+      --shadow-float: 0 14px 40px -14px rgba(0, 0, 0, 0.16), 0 0 0 1px var(--border-heavy);
+      --shadow-composer: 0 6px 22px -12px rgba(0, 0, 0, 0.12);
+      /* Exact Saint Hyper Agent typography variables (apps/web/src/index.css + fontFamily.ts + appTypography.ts) */
+      --font-ui-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+      --font-display-family: "Cal Sans", var(--font-ui-family);
+      --font-mono-family: "JetBrains Mono Variable", "JetBrains Mono", "SF Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      --terminal-font-family: "JetBrainsMono NFM", "JetBrainsMono NF", "JetBrains Mono", "SF Mono", monospace;
+      --font-ui: var(--font-ui-family);
+      --font-display: var(--font-ui-family);
+      --font-mono: var(--font-mono-family);
+      /* Exact SHA scale for DEFAULT_CHAT_FONT_SIZE_PX = 13, DEFAULT_TERMINAL_FONT_SIZE_PX = 12 */
+      --app-font-size-ui: 13px;
+      --app-font-size-ui-lg: 14px;
+      --app-font-size-ui-sm: 12px;
+      --app-font-size-ui-xs: 11px;
+      --app-font-size-ui-2xs: 10px;
+      --app-font-size-chat: 13px;
+      --app-font-size-chat-code: 12px;
+      --app-font-size-terminal: 12px;
+      --chat-line-height: 1.625;
+      --transcript-font: var(--font-ui-family);
+    }
+
+    html.sf-mono-first {
+      --font-mono-family: "SF Mono", ui-monospace, "JetBrains Mono Variable", "JetBrains Mono", Menlo, Consolas, monospace;
+      --terminal-font-family: "SF Mono", ui-monospace, "JetBrains Mono", Menlo, monospace;
+      --font-mono: var(--font-mono-family);
+    }
+
+    html.pure-tui-mode {
+      --transcript-font: var(--terminal-font-family);
+      --app-font-size-chat: 12px;
+      --chat-line-height: 1.55;
+    }
+
+    html.dark {
+      color-scheme: dark;
+      --surface: #111111;
+      --surface-under: #0c0c0c;
+      --sidebar-bg: #141414;
+      --panel: #171717;
+      --control-bg: #1c1c1c;
+      --elevated-bg: #202020;
+      --user-bubble: rgba(252, 252, 252, 0.045);
+      --ink: #fcfcfc;
+      --ink-secondary: rgba(252, 252, 252, 0.62);
+      /* SHA --muted-foreground (dark) is ~#818181; lifted to clear 4.5:1 on hovered rows over #202020 */
+      --ink-tertiary: #9a9a9a;
+      --border: rgba(252, 252, 252, 0.09);
+      --border-heavy: rgba(252, 252, 252, 0.15);
+      --divider: rgba(252, 252, 252, 0.055);
+      --accent: #f2612d;
+      --text-accent: #f6906c;
+      --accent-bg: rgba(242, 97, 45, 0.12);
+      --accent-border: rgba(242, 97, 45, 0.45);
+      --full-access: #fe8549;
+      --status-done: #00a240;
+      --status-blocked: #f5b44a;
+      --status-working: #b06dff;
+      --status-error: #e02e2a;
+      --status-done-ink: #22b45f;
+      --status-working-ink: #c08cff;
+      --status-blocked-ink: #f5b44a;
+      --status-error-ink: #ef6360;
+      --full-access-ink: #fe8549;
+      --diff-added-bg: rgba(0, 162, 64, 0.20);
+      --diff-removed-bg: rgba(224, 46, 42, 0.20);
+      --btn-hover: rgba(252, 252, 252, 0.055);
+      --btn-active: rgba(252, 252, 252, 0.09);
+      --btn-primary-bg: #fcfcfc;
+      --btn-primary-ink: #111111;
+      --shadow-float: 0 22px 54px -16px rgba(0, 0, 0, 0.72), 0 0 0 1px var(--border-heavy);
+      --shadow-composer: 0 10px 30px -14px rgba(0, 0, 0, 0.52);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: 0.5; }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--surface-under);
+      color: var(--ink);
+      font-family: var(--font-ui);
+      font-size: var(--app-font-size-ui);
+      letter-spacing: normal;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+
+    .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+    code { font-family: var(--font-mono); }
+
+    /* =========================================================================
+       FULL-VIEWPORT TERMINAL SHELL (no demo chrome, reads like the real app)
+       ========================================================================= */
+    .app-frame {
+      height: 100vh;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+    }
+
+    /* Minimal app bar (34px). The host window (SHA desktop / terminal) draws its own controls. */
+    .win-bar {
+      height: 34px;
+      background: var(--sidebar-bg);
+      border-bottom: 1px solid var(--divider);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      user-select: none;
+      flex-shrink: 0;
+      gap: 12px;
+    }
+
+    .win-left, .win-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+    /* The crumb gives way first; the right-side controls never clip. */
+    .win-left { flex: 1 1 auto; }
+    .win-right { flex: 0 0 auto; }
+    .win-crumb { min-width: 0; }
+    .win-crumb #hdr-session-name { overflow: hidden; text-overflow: ellipsis; }
+
+    .proto-tag {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--ink-tertiary);
+      white-space: nowrap;
+    }
+    .proto-tag .short { display: none; }
+
+    .icon-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--ink-secondary);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      height: 24px;
+      padding: 0 7px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      transition: background 120ms ease, color 120ms ease;
+      white-space: nowrap;
+    }
+    .icon-btn:hover { background: var(--btn-hover); color: var(--ink); }
+    .icon-btn.active { background: var(--btn-active); color: var(--ink); }
+    .icon-btn:active { background: var(--btn-active); transform: translateY(0.5px); }
+
+    .win-crumb {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--ink-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .win-crumb strong { color: var(--ink); font-weight: 500; }
+
+    .dot {
+      display: inline-block;
+      width: 6.5px;
+      height: 6.5px;
+      border-radius: 999px;
+      flex-shrink: 0;
+    }
+    .dot.done { background: var(--status-done); }
+    /* Every dot marks a real session state. No glow, no endless pulse: the braille spinner carries "live". */
+    .dot.blocked { background: var(--status-blocked); }
+    .dot.working { background: var(--status-working); }
+    .dot.idle { border: 1.5px solid var(--ink-tertiary); background: transparent; }
+    .dot.error { background: var(--status-error); }
+
+    /* =========================================================================
+       WORKSPACE BODY: SIDEBAR + MAIN PANE + OPTIONAL RIGHT DIFF DRAWER
+       ========================================================================= */
+    .workspace {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* --- LEFT SIDEBAR (Agent-Aware Status Rail · quiet, collapsible Ctrl+B) --- */
+    .sidebar {
+      width: 236px;
+      background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: width 180ms cubic-bezier(0.32, 0.72, 0, 1), opacity 160ms ease;
+      overflow: hidden;
+    }
+    .sidebar.collapsed { width: 0; border-right-width: 0; opacity: 0; pointer-events: none; visibility: hidden; transition: width 180ms cubic-bezier(0.32, 0.72, 0, 1), opacity 160ms ease, visibility 0s 180ms; }
+    .sb-scrim { display: none; }
+
+    .sb-state {
+      padding: 10px 8px;
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--ink-secondary);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      align-items: flex-start;
+    }
+    .sb-state strong { color: var(--ink); font-weight: 600; }
+    .sb-skeleton {
+      height: 38px;
+      border-radius: 8px;
+      background: var(--btn-hover);
+    }
+
+    .sb-head {
+      padding: 10px 10px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .sb-repo {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ink-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-left: 4px;
+    }
+
+    .sb-scroll {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .sb-group-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--ink-tertiary);
+      padding: 0 8px 4px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .sb-item {
+      appearance: none;
+      width: 100%;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      padding: 7px 8px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      transition: background 120ms ease;
+      color: var(--ink);
+    }
+    .sb-item:hover { background: var(--btn-hover); }
+    .sb-item.active { background: var(--user-bubble); box-shadow: inset 0 0 0 1px var(--border); }
+
+    .sb-row1 {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--ink);
+      min-width: 0;
+    }
+    .sb-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
+    .sb-spin { color: var(--status-working); font-size: 12px; width: 9px; text-align: center; }
+
+    .sb-row2 {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-left: 14px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--ink-tertiary);
+      gap: 6px;
+    }
+    .sb-diff-add { color: var(--status-done-ink); }
+    .sb-diff-del { color: var(--status-error-ink); }
+    .sb-needs { color: var(--status-blocked-ink); font-weight: 500; }
+    .ink-done { color: var(--status-done-ink); }
+    .ink-error { color: var(--status-error-ink); }
+    .ink-full { color: var(--full-access-ink); }
+
+    .sb-footer {
+      padding: 8px 10px;
+      border-top: 1px solid var(--divider);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--ink-tertiary);
+    }
+
+    /* --- CENTER MAIN PANE (focus canvas) --- */
+    .main-col {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      position: relative;
+      background: var(--surface);
+    }
+
+    .main-viewport {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* --- LANDING CANVAS (Inside main viewport when session is empty/idle) --- */
+    .wave-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; }
+
+    .landing-layer {
+      position: relative;
+      z-index: 2;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 24px;
+      pointer-events: none;
+    }
+    .landing-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      pointer-events: auto;
+      text-align: center;
+    }
+    .saint-mark {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.05;
+      color: var(--ink);
+      white-space: pre;
+      text-align: left;
+      user-select: none;
+    }
+    .saint-mark .crown { color: var(--accent); }
+    .hero-h1 { font-family: var(--font-ui); font-size: 24px; font-weight: 600; letter-spacing: normal; }
+    .hero-sub { font-family: var(--font-ui); font-size: 16px; font-weight: 400; color: var(--ink-tertiary); }
+
+    .quiet-prompts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+    .quiet-prompt {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--ink-secondary);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 130ms ease;
+    }
+    .quiet-prompt:hover { border-color: var(--accent-border); color: var(--ink); background: var(--elevated-bg); }
+    .quiet-prompt:active { background: var(--btn-active); }
+
+    /* --- AIRY DEVELOPER TRANSCRIPT (Max signal, zero clutter) --- */
+    .transcript {
+      flex: 1;
+      overflow-y: auto;
+      padding: 26px 28px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      max-width: 780px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .user-msg {
+      align-self: flex-end;
+      max-width: 82%;
+      background: var(--user-bubble);
+      border: 1px solid var(--divider);
+      border-radius: 16px;
+      padding: 10px 14px;
+      font-family: var(--transcript-font);
+      font-size: var(--app-font-size-chat);
+      line-height: var(--chat-line-height);
+      color: var(--ink);
+      overflow-wrap: anywhere;
+    }
+
+    /* Single-line collapsed activity trigger, expands on click */
+    .activity-block {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+    .activity-summary {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--ink-secondary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 2px 0;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      text-align: left;
+      width: fit-content;
+    }
+    .activity-summary:hover { color: var(--ink); }
+    .activity-summary .caret { color: var(--ink-tertiary); font-size: 10px; }
+
+    .activity-tree {
+      margin-left: 5px;
+      padding-left: 12px;
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .activity-tree.collapsed { display: none; }
+
+    .tool-line {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 11.5px;
+      color: var(--ink-secondary);
+      line-height: 1.45;
+      flex-wrap: wrap;
+    }
+    .tool-line .t-verb { color: var(--ink); font-weight: 500; min-width: 58px; }
+    .tool-line .t-arg { color: var(--text-accent); overflow-wrap: anywhere; }
+    .tool-line button.t-arg {
+      appearance: none; border: none; background: transparent; padding: 0;
+      font: inherit; text-align: left; border-radius: 3px;
+    }
+    .tool-line button.t-arg:hover { text-decoration: underline; }
+    .tool-line button.t-arg:active { opacity: 0.75; }
+    .tool-line span.t-arg { color: var(--ink-secondary); }
+    .tool-line .t-note { color: var(--ink-tertiary); font-size: 11px; }
+
+    .assistant-msg {
+      font-family: var(--transcript-font);
+      font-size: var(--app-font-size-chat);
+      line-height: var(--chat-line-height);
+      color: var(--ink);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .assistant-msg code {
+      background: var(--user-bubble);
+      border: 1px solid var(--divider);
+      padding: 1px 5px;
+      border-radius: 6px;
+      font-family: var(--font-mono);
+      font-size: var(--app-font-size-chat-code);
+      color: var(--text-accent);
+    }
+
+    .msg-meta {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--ink-tertiary);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 10px;
+    }
+    .msg-meta button { white-space: nowrap; }
+    .msg-meta button {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--ink-tertiary);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      cursor: pointer;
+    }
+    .msg-meta button:hover { color: var(--ink); text-decoration: underline; }
+    .msg-meta button:active { opacity: 0.7; }
+
+    .handoff-divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--ink-tertiary);
+    }
+    .handoff-divider::before, .handoff-divider::after { content: ""; flex: 1; height: 1px; background: var(--divider); }
+
+    /* =========================================================================
+       FLOATING COMPOSER + INLINE PALETTE + DETACHED DECISION CARD
+       ========================================================================= */
+    .composer-dock {
+      width: 100%;
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 0 24px 16px;
+      position: relative;
+      z-index: 10;
+      flex-shrink: 0;
+    }
+
+    /* Inline Floating Command/File/Skill Popover directly above composer */
+    .inline-popover {
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      bottom: calc(100% + 2px);
+      background: var(--elevated-bg);
+      border-radius: 12px;
+      box-shadow: var(--shadow-float);
+      overflow: hidden;
+      display: none;
+      flex-direction: column;
+      max-height: 270px;
+      z-index: 30;
+    }
+    .inline-popover.open { display: flex; animation: pop-in 120ms ease-out; }
+    @keyframes pop-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+
+    .pop-head {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--divider);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--ink-tertiary);
+      display: flex;
+      justify-content: space-between;
+    }
+    .pop-list { overflow-y: auto; padding: 4px; }
+    .pop-row {
+      appearance: none;
+      width: 100%;
+      border: none;
+      background: transparent;
+      border-radius: 7px;
+      padding: 6px 9px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--ink);
+      cursor: pointer;
+      text-align: left;
+    }
+    .pop-row:hover, .pop-row.active { background: var(--btn-hover); }
+    .pop-row:active { background: var(--btn-active); }
+    .pop-empty { padding: 10px 12px; font-size: 11.5px; color: var(--ink-secondary); }
+    /* Highlight = solid row fill only. The committed choice gets a ✓ (shape, not just color). */
+    .pop-row.active { background: var(--btn-active); }
+    .pop-row .check { color: var(--ink); font-size: 11px; margin-left: 6px; }
+    .pop-row .sub { color: var(--ink-tertiary); font-size: 10.5px; margin-left: 8px; }
+    .pop-row .tag { color: var(--ink-tertiary); font-size: 10.5px; }
+
+    /* Detached Decision Card (mirrors SHA ComposerPendingApprovalPanel) */
+    .decision-card {
+      background: var(--panel);
+      border: 1px solid var(--border-heavy);
+      border-radius: 13px;
+      box-shadow: var(--shadow-composer);
+      padding: 13px 14px;
+      margin-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+    }
+    .decision-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .decision-title { font-family: var(--font-display); font-size: 13.5px; font-weight: 600; letter-spacing: -0.015em; }
+    .decision-cmd {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 8px 11px;
+      border-radius: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--ink);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      overflow-wrap: anywhere;
+    }
+    .sandbox-pill {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--ink-tertiary);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      padding: 2px 7px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .sandbox-pill:hover { color: var(--ink); border-color: var(--border-heavy); }
+    .sandbox-detail {
+      display: none;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--ink-secondary);
+      padding: 6px 10px;
+      border-radius: 7px;
+      background: var(--surface);
+      border: 1px dashed var(--border);
+      line-height: 1.55;
+    }
+    .sandbox-detail.open { display: block; }
+
+    .choice-row {
+      appearance: none;
+      width: 100%;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      padding: 6px 8px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 2px 9px;
+      text-align: left;
+      cursor: pointer;
+      transition: background 120ms ease;
+    }
+    .choice-row:hover { background: var(--btn-hover); }
+    .choice-row:active { background: var(--btn-active); }
+    .choice-row.destructive:hover { background: rgba(224, 46, 42, 0.09); }
+    .choice-num {
+      width: 19px;
+      height: 19px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      color: var(--ink-secondary);
+      flex-shrink: 0;
+    }
+    /* Numbers stay neutral (they are keyboard shortcuts, not status). Decline turns red only when you point at it. */
+    .choice-row.destructive:hover .choice-label { color: var(--status-error-ink); }
+    .choice-label { font-size: 12.5px; font-weight: 500; color: var(--ink); }
+    .choice-desc { font-size: 11.5px; color: var(--ink-tertiary); }
+
+    /* Steer queue slim 1-line strip */
+    .steer-strip {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 12px;
+      margin: 0 12px -1px;
+      border-radius: 10px 10px 0 0;
+      background: var(--accent-bg);
+      border: 1px solid var(--accent-border);
+      border-bottom: none;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink);
+      gap: 8px;
+    }
+    .steer-strip.open { display: flex; }
+    .steer-strip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+
+    .composer-shell {
+      background: var(--control-bg);
+      border: 1px solid var(--border-heavy);
+      border-radius: 15px;
+      box-shadow: var(--shadow-composer);
+      padding: 10px 12px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: border-color 140ms ease;
+    }
+    /* The input drops its own outline; the whole shell carries the focus ring instead. */
+    .composer-shell:focus-within { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow-composer); }
+
+    .composer-input {
+      width: 100%;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--ink);
+      font-family: var(--transcript-font);
+      font-size: var(--app-font-size-chat);
+      line-height: var(--chat-line-height);
+    }
+    .composer-input::placeholder { color: var(--ink-tertiary); }
+
+    .composer-foot {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .foot-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+    .quiet-pill {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--ink-secondary);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 3px 7px;
+      border-radius: 999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .quiet-pill:hover { background: var(--btn-hover); color: var(--ink); }
+    .quiet-pill:active { background: var(--btn-active); }
+    .quiet-pill.plan { color: var(--status-working-ink);background: rgba(176, 109, 255, 0.12); }
+    .quiet-pill.auto { color: var(--status-done-ink); background: rgba(0, 162, 64, 0.11); }
+    .quiet-pill.full { color: var(--full-access-ink); background: rgba(254, 133, 73, 0.13); font-weight: 500; }
+
+    .access-popover {
+      position: absolute;
+      left: 24px;
+      bottom: calc(100% - 4px);
+      width: 340px;
+      max-width: calc(100% - 48px);
+      background: var(--elevated-bg);
+      border-radius: 12px;
+      box-shadow: var(--shadow-float);
+      padding: 6px;
+      display: none;
+      flex-direction: column;
+      gap: 2px;
+      z-index: 35;
+      font-family: var(--font-mono);
+    }
+    .access-popover.open { display: flex; animation: pop-in 120ms ease-out; }
+    .access-opt {
+      appearance: none;
+      border: none;
+      background: transparent;
+      border-radius: 8px;
+      padding: 7px 9px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      color: var(--ink);
+    }
+    .access-opt:hover { background: var(--btn-hover); }
+    .access-opt.active { background: var(--btn-active); }
+    .access-opt.active .access-opt-top > span:first-child::after { content: "  ✓"; color: var(--ink); }
+    .access-opt-top { display: flex; align-items: center; justify-content: space-between; font-size: 11.5px; font-weight: 600; }
+    .access-opt-desc { font-family: var(--font-ui); font-size: 11.5px; color: var(--ink-tertiary); line-height: 1.35; }
+
+    .send-btn {
+      width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      border: none;
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-ink);
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .send-btn:hover { opacity: 0.86; }
+    .send-btn:active { opacity: 0.7; transform: translateY(0.5px); }
+
+    /* =========================================================================
+       RIGHT DRAWER: SPLIT DIFF (on demand, Ctrl+D; nothing on screen when closed)
+       ========================================================================= */
+    .diff-drawer {
+      width: 0;
+      border-left: 0 solid var(--border);
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: width 200ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s 200ms;
+      flex-shrink: 0;
+      visibility: hidden;
+    }
+    .diff-drawer.open { width: 440px; border-left-width: 1px; visibility: visible; transition: width 200ms cubic-bezier(0.32, 0.72, 0, 1); }
+    .diff-empty { padding: 18px 14px; font-family: var(--font-ui); font-size: 12.5px; line-height: 1.55; color: var(--ink-secondary); }
+    .diff-empty strong { display: block; color: var(--ink); font-weight: 600; margin-bottom: 2px; }
+
+    .drawer-head {
+      height: 36px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--divider);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      flex-shrink: 0;
+    }
+    .file-tabs {
+      display: flex;
+      gap: 2px;
+      padding: 6px 10px;
+      border-bottom: 1px solid var(--divider);
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+    .file-tab {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: var(--ink-secondary);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .file-tab:hover { background: var(--btn-hover); color: var(--ink); }
+    .file-tab.active { background: var(--btn-active); color: var(--ink); }
+
+    .diff-scroll {
+      flex: 1;
+      overflow: auto;
+      padding: 8px 0;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .diff-row {
+      display: grid;
+      grid-template-columns: 56px 16px 1fr;
+      padding: 1.5px 10px;
+      line-height: 1.55;
+      white-space: pre;
+    }
+    .diff-row.plain { grid-template-columns: 32px 16px 1fr; }
+    .diff-row .ln { color: var(--ink-tertiary); user-select: none; }
+    .diff-row.add .ln, .diff-row.del .ln { color: var(--ink-secondary); }
+    .diff-row.add { background: var(--diff-added-bg); }
+    .diff-row.add .sg { color: var(--status-done-ink); }
+    .diff-row.del { background: var(--diff-removed-bg); }
+    .diff-row.del .sg { color: var(--status-error-ink); }
+
+    .drawer-foot {
+      padding: 8px 12px;
+      border-top: 1px solid var(--divider);
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--ink-tertiary);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* =========================================================================
+       BOTTOM TERMINAL DRAWER (Ctrl+J: raw headless CLI on demand)
+       ========================================================================= */
+    .cli-drawer {
+      height: 0;
+      border-top: 0 solid var(--border);
+      background: var(--surface-under);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: height 180ms cubic-bezier(0.32, 0.72, 0, 1), visibility 0s 180ms;
+      flex-shrink: 0;
+      visibility: hidden;
+    }
+    .cli-drawer.open { height: 190px; border-top-width: 1px; visibility: visible; transition: height 180ms cubic-bezier(0.32, 0.72, 0, 1); }
+    .cli-tabs { display: flex; align-items: center; gap: 6px; min-width: 0; overflow-x: auto; }
+    .cli-tabs > span { white-space: nowrap; }
+
+    .cli-drawer-head {
+      height: 30px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--divider);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-secondary);
+      flex-shrink: 0;
+    }
+    .cli-drawer-body {
+      flex: 1;
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      line-height: 1.55;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      color: var(--ink-secondary);
+    }
+
+    /* =========================================================================
+       AGENT BOARD OVERLAY (Ctrl+G: every session at a glance)
+       ========================================================================= */
+    .board-view {
+      display: none;
+      flex: 1;
+      padding: 20px 24px;
+      overflow-y: auto;
+      background: var(--surface);
+    }
+    .board-view.open { display: flex; flex-direction: column; gap: 16px; }
+    .board-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      flex: 1;
+    }
+    .board-col {
+      background: var(--sidebar-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .board-col-head {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--ink-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--divider);
+    }
+    .board-card {
+      appearance: none;
+      border: 1px solid var(--border);
+      background: var(--panel);
+      border-radius: 9px;
+      padding: 10px 11px;
+      text-align: left;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      transition: border-color 120ms ease, background 120ms ease;
+    }
+    .board-card:hover { border-color: var(--accent-border); background: var(--elevated-bg); }
+    .board-card:active { background: var(--btn-active); }
+    .board-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .board-head h2 { font-family: var(--font-display); font-size: 17px; font-weight: 600; letter-spacing: -0.02em; }
+    .board-empty { font-family: var(--font-ui); font-size: 12px; line-height: 1.5; color: var(--ink-secondary); padding: 4px 2px; }
+    .board-card-title { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--ink); }
+    .board-card-sub { font-family: var(--font-mono); font-size: 11px; color: var(--ink-secondary); line-height: 1.45; }
+    .board-card-meta { font-family: var(--font-mono); font-size: 10px; color: var(--ink-tertiary); display: flex; justify-content: space-between; }
+
+    /* =========================================================================
+       ON-DEMAND FLOATING POPOVERS (Cache Meter, /btw, /tree, Shortcuts)
+       ========================================================================= */
+    .float-popover {
+      position: fixed;
+      top: 42px;
+      right: 16px;
+      width: min(318px, calc(100vw - 24px));
+      background: var(--elevated-bg);
+      border-radius: 12px;
+      box-shadow: var(--shadow-float);
+      padding: 13px 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 60;
+    }
+    .float-popover.open { display: flex; animation: pop-in 120ms ease-out; }
+    #model-popover { width: min(360px, calc(100vw - 24px)); right: 84px; }
+    /* Model picker: names in the UI sans (what you read), IDs in mono (what you copy). One line per row. */
+    #model-pick-list .pop-row { font-family: var(--font-ui); font-size: 12.5px; }
+    #model-pick-list .pop-row > span:first-child { white-space: nowrap; flex-shrink: 0; display: inline-flex; align-items: center; gap: 6px; }
+    #model-pick-list .tag, #model-pick-list .sel {
+      font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-tertiary);
+      min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .model-provider .caret { color: var(--ink-tertiary); width: 10px; font-size: 9px; }
+    .model-group { margin: 1px 0 4px 13px; padding-left: 7px; border-left: 1px solid var(--border); display: flex; flex-direction: column; gap: 1px; }
+    .model-state { padding: 5px 9px; font-family: var(--font-ui); font-size: 11.5px; line-height: 1.45; color: var(--ink-secondary); display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+    .model-sep { height: 1px; background: var(--divider); margin: 4px 2px; }
+    .pop-label { color: var(--ink-tertiary); font-size: 11px; }
+
+    .ttl-track { height: 5px; border-radius: 999px; background: var(--border); overflow: hidden; }
+    .ttl-track > span { display: block; height: 100%; background: var(--status-done); transition: width 250ms ease; }
+    .kv { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; color: var(--ink-secondary); }
+    .kv dd { color: var(--ink); text-align: right; }
+
+    .btw-sheet {
+      position: fixed;
+      right: 20px;
+      bottom: 24px;
+      width: min(380px, calc(100vw - 24px));
+      background: var(--elevated-bg);
+      border-radius: 13px;
+      box-shadow: var(--shadow-float);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 65;
+      font-family: var(--font-mono);
+    }
+    .btw-sheet.open { display: flex; animation: pop-in 140ms ease-out; }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.42);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 70;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-box {
+      width: 460px;
+      max-width: 92vw;
+      background: var(--elevated-bg);
+      border-radius: 14px;
+      box-shadow: var(--shadow-float);
+      overflow: hidden;
+      font-family: var(--font-mono);
+    }
+
+    /* ---- Responsive: overlay rails at tablet, compact chrome at phone ---- */
+    @media (max-width: 1100px) {
+      .diff-drawer.open { width: 380px; }
+    }
+    @media (max-width: 820px) {
+      .sidebar { position: absolute; z-index: 40; height: 100%; box-shadow: var(--shadow-float); }
+      .sb-scrim { display: block; position: absolute; inset: 0; z-index: 39; background: rgba(0, 0, 0, 0.36); border: none; }
+      .sidebar.collapsed + .sb-scrim { display: none; }
+      .diff-drawer.open { width: 100%; position: absolute; right: 0; top: 0; bottom: 0; z-index: 45; }
+      .board-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 640px) {
+      .win-bar { padding: 0 6px; gap: 6px; }
+      .win-right { gap: 2px; }
+      .win-crumb .crumb-root, .win-crumb .crumb-sep { display: none; }
+      .proto-tag .long { display: none; }
+      .proto-tag .short { display: inline; }
+      #btn-font-mode, #btn-mono-face { display: none; }
+      #hdr-cache-label { max-width: 76px; overflow: hidden; text-overflow: ellipsis; }
+      .composer-foot { flex-wrap: wrap; row-gap: 4px; }
+      .foot-group { flex-wrap: nowrap; }
+    }
+    @media (max-width: 480px) {
+      /* Phone: the cache trigger collapses to its status dot (full text stays in the popover). */
+      #hdr-cache-label { display: none; }
+      #hdr-model-label { max-width: 64px; overflow: hidden; text-overflow: ellipsis; }
+      .composer-foot { flex-wrap: nowrap; }
+      #model-popover { right: 12px; }
+      .float-popover { right: 12px; }
+      .btw-sheet { right: 12px; bottom: 12px; }
+      .transcript { padding: 18px 14px 10px; }
+      .composer-dock { padding: 0 10px 10px; }
+      .inline-popover { left: 10px; right: 10px; }
+      .access-popover { left: 10px; max-width: calc(100% - 20px); }
+      .user-msg { max-width: 92%; }
+      .board-view { padding: 14px; }
+      .pop-head > span:last-child { display: none; }
+    }
+    /* Touch: every control reaches the 44px minimum target. */
+    @media (pointer: coarse) {
+      .win-bar { height: 48px; }
+      .icon-btn, .quiet-pill, .file-tab, .sandbox-pill, .quiet-prompt, .msg-meta button { min-height: 44px; }
+      .icon-btn { min-width: 44px; justify-content: center; }
+      .send-btn { width: 44px; height: 44px; }
+      .choice-row, .pop-row, .access-opt, .sb-item, .board-card { min-height: 44px; }
+      .activity-summary, .tool-line button.t-arg { min-height: 44px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <h1 class="sr-only">SaintHarness CLI prototype</h1>
+  <div class="app-frame">
+    <!-- =======================================================================
+         SINGLE QUIET TOP BAR (progressive disclosure triggers only)
+         ======================================================================= -->
+    <header class="win-bar">
+      <div class="win-left">
+        <button class="icon-btn active" id="btn-sidebar" title="Toggle session sidebar (Ctrl+B)" aria-label="Toggle session sidebar" aria-controls="sidebar" aria-expanded="true"><span aria-hidden="true">◧</span></button>
+        <div class="win-crumb">
+          <strong class="crumb-root">SaintHarness</strong>
+          <span class="crumb-sep" style="color:var(--ink-tertiary)" aria-hidden="true">/</span>
+          <span id="hdr-session-name">fix/wal-lock</span>
+        </div>
+        <span class="proto-tag" title="Every number, model name, and session in this file is illustrative. Nothing was measured."><span class="long">prototype · sample data</span><span class="short">sample</span></span>
+      </div>
+
+      <div class="win-right">
+        <!-- Three glance triggers; each opens its detail on demand -->
+        <button class="icon-btn" id="btn-cache" title="Prompt cache and token detail" aria-haspopup="dialog" aria-controls="cache-popover" aria-expanded="false">
+          <span class="dot done" id="hdr-cache-dot" aria-hidden="true"></span>
+          <span id="hdr-cache-label">Warm 4m12s · 88%</span>
+        </button>
+        <button class="icon-btn" id="btn-diff" title="Toggle split diff (Ctrl+D)" aria-controls="diff-drawer" aria-expanded="false">
+          <span class="sb-diff-add">+24</span><span class="sb-diff-del">-6</span>
+        </button>
+        <button class="icon-btn" id="btn-model" title="Switch model, cross-model handoff (Alt+])" aria-haspopup="menu" aria-controls="model-popover" aria-expanded="false">
+          <span id="hdr-model-label">Qwen 3.8</span>
+          <span style="color:var(--ink-tertiary)" aria-hidden="true">▾</span>
+        </button>
+        <button class="icon-btn" id="btn-font-mode" title="Compare fonts: SHA chat sans vs pure terminal mono" aria-pressed="false">SHA</button>
+        <button class="icon-btn" id="btn-mono-face" title="Compare mono faces: JetBrains Mono (SHA default) vs SF Mono" aria-pressed="false">JB</button>
+        <button class="icon-btn" id="btn-cli" title="Toggle headless CLI drawer (Ctrl+J)" aria-label="Toggle headless CLI drawer" aria-controls="cli-drawer" aria-expanded="false"><span aria-hidden="true">&gt;_</span></button>
+        <button class="icon-btn" id="btn-theme" title="Toggle dark / light theme" aria-label="Toggle dark or light theme"><span aria-hidden="true">◐</span></button>
+      </div>
+    </header>
+
+    <!-- =======================================================================
+         UNIFIED WORKSPACE: AGENT STATUS SIDEBAR + MAIN CANVAS + RIGHT DIFF
+         ======================================================================= -->
+    <div class="workspace">
+      <!-- AGENT-AWARE STATUS SIDEBAR -->
+      <aside class="sidebar" id="sidebar" aria-label="Sessions">
+        <div class="sb-head">
+          <div class="sb-repo">
+            <span>SaintHarness</span>
+          </div>
+          <button class="icon-btn" id="btn-new-session" title="New session (Ctrl+N)" aria-label="New session"><span aria-hidden="true">+</span></button>
+        </div>
+
+        <nav class="sb-scroll" id="sb-list" aria-label="Session list"></nav>
+
+        <div class="sb-footer">
+          <button class="icon-btn" id="btn-board" style="padding:0 5px;height:22px;font-size:10.5px;" title="Agent board (Ctrl+G)" aria-pressed="false"><span aria-hidden="true">⊞</span> Board</button>
+          <span id="daemon-status" title="SQLite WAL daemon reachable (sample cold start)"><span class="dot done" aria-hidden="true"></span> wal · 11ms</span>
+        </div>
+      </aside>
+      <button class="sb-scrim" id="sb-scrim" aria-label="Close session sidebar" tabindex="-1"></button>
+
+      <!-- CENTER COLUMN: FOCUS VIEW OR BOARD VIEW + OPTIONAL BOTTOM CLI -->
+      <main class="main-col">
+        <!-- AGENT BOARD VIEW (Ctrl+G) -->
+        <section class="board-view" id="board-view" aria-labelledby="board-title">
+          <div class="board-head">
+            <div>
+              <h2 id="board-title">Agent Board</h2>
+              <div class="mono" style="font-size:11.5px;color:var(--ink-tertiary);margin-top:2px;">Every session on this daemon. Open a card to jump in.</div>
+            </div>
+            <button class="icon-btn active" id="btn-close-board">Back to session · Esc</button>
+          </div>
+          <div class="board-grid" id="board-grid"></div>
+        </section>
+
+        <!-- FOCUS SESSION VIEW -->
+        <div class="main-viewport" id="focus-view">
+          <!-- Landing (shown when active session is empty/idle) -->
+          <div id="landing-pane" style="display:none;flex:1;position:relative;flex-direction:column;">
+            <canvas id="ascii-wave" class="wave-canvas" aria-hidden="true"></canvas>
+            <div class="landing-layer">
+              <div class="landing-inner">
+                <div class="saint-mark" role="img" aria-label="Saint logo"><span class="crown">     ⡀ ⣰⣆ ⢀
+  ⠈⢷⣤⣿⠶⠿⠿⠶⣿⣤⡾⠁
+   ⠈⠳⢂⣠⣤⣤⣄⡐⠞⠁</span>
+⢀⣠⣴⣶⣿⣿⣿⡿⢿⣿⣿⣿⣶⣦⣄⡀
+⣿⡟⠉⣱⣿⢋⣴⡶⢶⣦⡝⢿⣎⠉⢻⣿
+⣿⡇ ⣿⡇⣿⣏  ⢹⣿⣼⣿ ⢸⣿
+⣿⡇ ⠹⣿⣌⠻⢷⢆⣄⡈⠙⠿ ⢸⣿
+⣿⡇ ⡀⠈⠛⠿⢂⣬⡛⢿⣦⡀ ⢸⣿
+⣿⣇ ⣿⣷⣦⡀⠈⠙⢿⣧⢹⣷ ⣸⣿
+⠹⣿⡄⢻⣧⠻⣷⣤⣤⣾⠏⣼⡟⢠⣿⠏
+ ⠹⣿⣆⠻⢷⣦⡍⢩⣴⡾⠟⣰⣿⠏
+  ⠈⠻⣿⣦⣈⠁⠈⣁⣴⣿⠟⠁
+    ⠈⠙⠻⢿⡿⠟⠋⠁</div>
+                <div class="hero-h1">Let's build</div>
+                <div class="hero-sub">SaintHarness · main</div>
+                <div class="quiet-prompts">
+                  <button class="quiet-prompt" data-prompt="Fix SQLITE_BUSY under 32 concurrent writers">Fix SQLITE_BUSY concurrency</button>
+                  <button class="quiet-prompt" data-prompt="Map workspace architecture with RepoMap">Map architecture</button>
+                  <button class="quiet-prompt" data-prompt="Run eval --repeat 3 on Hashline vs StrReplace">Compare Hashline eval</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Active Session Transcript -->
+          <div class="transcript" id="transcript"></div>
+
+          <!-- Floating Composer Dock -->
+          <div class="composer-dock">
+            <!-- Inline / @ $ Popover -->
+            <div class="inline-popover" id="inline-popover">
+              <div class="pop-head">
+                <span id="pop-title">Commands</span>
+                <span>↑↓ select · Enter run · Esc close</span>
+              </div>
+              <div class="pop-list" id="pop-list" role="listbox" aria-label="Suggestions"></div>
+            </div>
+
+            <!-- Runtime Access / Permission Mode Picker (1-to-1 SHA RuntimeMode: approval-required | auto | full-access) -->
+            <div class="access-popover" id="access-popover" role="menu" aria-label="Runtime permission mode">
+              <button class="access-opt active" data-rmode="approval-required" role="menuitemradio" aria-checked="true">
+                <div class="access-opt-top"><span>○ Ask for approval</span><span style="color:var(--ink-tertiary);font-weight:400;">approval-required</span></div>
+                <div class="access-opt-desc">Asks before editing files or running shell commands (Landlock WorkspaceWrite).</div>
+              </button>
+              <button class="access-opt" data-rmode="auto" role="menuitemradio" aria-checked="false">
+                <div class="access-opt-top"><span>● Auto mode</span><span style="color:var(--ink-tertiary);font-weight:400;">--auto</span></div>
+                <div class="access-opt-desc">Approves edits and builds inside the workspace sandbox. Still asks for unsafe or external actions.</div>
+              </button>
+              <button class="access-opt" data-rmode="full-access" role="menuitemradio" aria-checked="false">
+                <div class="access-opt-top"><span>▲ Bypass permissions</span><span class="ink-full" style="font-weight:400;">full-access</span></div>
+                <div class="access-opt-desc">Skips every permission prompt and disables the OS sandbox.</div>
+              </button>
+            </div>
+
+            <!-- Detached Decision Card (only renders when the session is blocked) -->
+            <div id="decision-slot"></div>
+
+            <!-- Steer queue indicator -->
+            <div class="steer-strip" id="steer-strip" role="status">
+              <span id="steer-text">Steer queued, sent after the current tool finishes</span>
+              <button class="icon-btn" id="steer-clear" style="height:18px;font-size:10px;" aria-label="Discard queued steer"><span aria-hidden="true">✕</span></button>
+            </div>
+
+            <!-- Single Calm Composer Shell -->
+            <div class="composer-shell">
+              <label class="sr-only" for="composer-input">Message the agent</label>
+              <input class="composer-input" id="composer-input" type="text" placeholder="Ask anything · / commands · @ files · $ skills" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="pop-list" aria-expanded="false" />
+              <div class="composer-foot">
+                <div class="foot-group">
+                  <button class="quiet-pill" id="pill-mode" title="Toggle Build / Plan (read-only) mode" aria-pressed="false">Build</button>
+                  <button class="quiet-pill" id="pill-access" title="Runtime permission mode" aria-haspopup="menu" aria-controls="access-popover" aria-expanded="false">○ Ask for approval ▾</button>
+                </div>
+                <div class="foot-group">
+                  <!-- /btw and /tree live only in the / palette (and Ctrl+Alt+S / Ctrl+T); the footer keeps mode, access, context, send. -->
+                  <span style="color:var(--ink-tertiary);padding:0 4px;" id="foot-ctx" title="Context used / window (sample)">48K / 110K</span>
+                  <button class="send-btn" id="btn-send" title="Send (Enter)" aria-label="Send message"><span aria-hidden="true">↑</span></button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- INTEGRATED HEADLESS CLI DRAWER (Ctrl+J) -->
+        <section class="cli-drawer" id="cli-drawer" aria-label="Headless CLI output">
+          <div class="cli-drawer-head">
+            <div class="cli-tabs">
+              <span>Terminal · saint-harness CLI</span>
+              <button class="icon-btn active" data-cli="status" style="height:20px;font-size:10.5px;" aria-pressed="true">server status</button>
+              <button class="icon-btn" data-cli="eval" style="height:20px;font-size:10.5px;" aria-pressed="false">eval --repeat 3</button>
+              <button class="icon-btn" data-cli="models" style="height:20px;font-size:10.5px;" aria-pressed="false">models</button>
+              <button class="icon-btn" id="btn-cli-json" style="height:20px;font-size:10.5px;" aria-pressed="false">--json</button>
+            </div>
+            <button class="icon-btn" id="btn-close-cli" style="height:20px;" aria-label="Close CLI drawer"><span aria-hidden="true">✕</span></button>
+          </div>
+          <div class="cli-drawer-body" id="cli-drawer-body"></div>
+        </section>
+      </main>
+
+      <!-- ON-DEMAND RIGHT SPLIT DIFF DRAWER (Ctrl+D) -->
+      <aside class="diff-drawer" id="diff-drawer" aria-label="Changes">
+        <div class="drawer-head">
+          <span class="mono" style="color:var(--ink);font-weight:500;">Changes <span id="drawer-diff-stat"><span class="sb-diff-add">+24</span> <span class="sb-diff-del">-6</span></span></span>
+          <div style="display:flex;gap:4px;">
+            <button class="icon-btn active" id="btn-hashline" style="font-size:10.5px;" title="Show Hashline anchors instead of line numbers" aria-pressed="true">#hash</button>
+            <button class="icon-btn" id="btn-close-diff" aria-label="Close changes drawer"><span aria-hidden="true">✕</span></button>
+          </div>
+        </div>
+        <div class="file-tabs" id="diff-file-tabs">
+          <button class="file-tab active" data-df="writer">store/writer.rs</button>
+          <button class="file-tab" data-df="projector">store/projector.rs</button>
+          <button class="file-tab" data-df="test">writer_test.rs</button>
+        </div>
+        <div class="diff-scroll" id="diff-scroll"></div>
+        <div class="drawer-foot">
+          <span class="ink-done">✓ tree-sitter 0.4ms · LSP 0 err</span>
+          <span>snap_7c2e1f</span>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       ON-DEMAND POPOVER: CACHE & TOKEN ENGINE (click Warm 4m12s · 88%)
+       ========================================================================= -->
+  <div class="float-popover" id="cache-popover" role="dialog" aria-label="Prompt cache detail">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <strong style="color:var(--ink)">Prompt cache: <span id="pop-cache-state" class="ink-done">Warm</span></strong>
+      <span id="pop-cache-ttl" style="color:var(--ink-secondary)">4m12s / 5m00s</span>
+    </div>
+    <div class="ttl-track"><span id="pop-ttl-bar" style="width:84%"></span></div>
+    <dl class="kv">
+      <dt>Cache read</dt><dd id="pop-cr">41.8K tok (88.1%)</dd>
+      <dt>Cache write / Non-cached</dt><dd>5.6K / 820 tok</dd>
+      <dt>PruneEpoch</dt><dd id="pop-epoch">#2 frozen (3 masks queued)</dd>
+      <dt>Write-Time Condenser</dt><dd>118 KB → 31 KB (↓74%)</dd>
+      <dt>Session cost</dt><dd>$0.014</dd>
+    </dl>
+    <div style="display:flex;gap:6px;padding-top:4px;border-top:1px solid var(--divider);">
+      <button class="icon-btn active" id="btn-sim-cold" style="flex:1;justify-content:center;">Expire TTL → PruneEpoch #3</button>
+    </div>
+    <div class="pop-label">Sample values. Nothing here was measured.</div>
+  </div>
+
+  <!-- =========================================================================
+       ON-DEMAND POPOVER: MODEL / HANDOFF PICKER (click Qwen 3.8)
+       ========================================================================= -->
+  <div class="float-popover" id="model-popover" role="dialog" aria-labelledby="model-pop-title">
+    <div class="pop-label" id="model-pop-title">Cross-model handoff, keeps this session</div>
+    <!-- Rendered by renderModelTree(): provider rows expand into a tree loaded from the provider catalog -->
+    <div style="display:flex;flex-direction:column;gap:2px;max-height:min(360px, 60vh);overflow-y:auto;" id="model-pick-list"></div>
+  </div>
+
+  <!-- =========================================================================
+       ON-DEMAND FLOATING /btw EPHEMERAL SIDECHAT (Ctrl+Alt+S)
+       ========================================================================= -->
+  <div class="btw-sheet" id="btw-sheet" role="dialog" aria-labelledby="btw-title">
+    <div style="padding:8px 12px;border-bottom:1px solid var(--divider);display:flex;justify-content:space-between;align-items:center;font-size:11px;gap:8px;">
+      <span id="btw-title" style="color:var(--ink);font-weight:500;">/btw · <span class="ink-done">warm prefix, no history writes</span></span>
+      <button class="icon-btn" id="btn-close-btw" style="height:20px;" aria-label="Close side question">Esc</button>
+    </div>
+    <div style="padding:11px 12px;font-size:11.5px;display:flex;flex-direction:column;gap:8px;">
+      <div id="btw-out" style="color:var(--ink-secondary);line-height:1.55;" aria-live="polite">
+        Ask a side question on this session's warm cache. The answer is not added to the conversation.
+      </div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;">
+        <button class="icon-btn btw-q" style="border:1px solid var(--border);font-size:10.5px;" data-a="No. BEGIN IMMEDIATE only serializes other writers; read-only WAL connections are not blocked.">WAL read lock?</button>
+        <button class="icon-btn btw-q" style="border:1px solid var(--border);font-size:10.5px;" data-a="PruneEpoch freezes older tool outputs while the cache is warm and flushes masks only after the TTL expires or soft_shake runs, so pruning never forces a cache miss.">Why PruneEpoch?</button>
+      </div>
+      <label for="btw-input" style="color:var(--ink-secondary);font-size:11px;">Side question</label>
+      <input class="composer-input" id="btw-input" type="text" placeholder="Type and press Enter" style="padding:6px 8px;background:var(--surface);border-radius:7px;border:1px solid var(--border);font-size:11.5px;" />
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       ON-DEMAND /tree SESSION DAG MODAL (Ctrl+T)
+       ========================================================================= -->
+  <div class="modal-backdrop" id="tree-modal">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="tree-title">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--divider);display:flex;justify-content:space-between;align-items:center;font-size:12px;">
+        <strong style="color:var(--ink)" id="tree-title">Session tree</strong>
+        <div style="display:flex;gap:6px;">
+          <button class="icon-btn active" id="btn-fork-node">+ Fork HEAD</button>
+          <button class="icon-btn" id="btn-close-tree" aria-label="Close session tree">Esc</button>
+        </div>
+      </div>
+      <div style="padding:10px;display:flex;flex-direction:column;gap:3px;" id="tree-nodes"></div>
+      <div style="padding:8px 14px;border-top:1px solid var(--divider);font-size:10.5px;color:var(--ink-tertiary);" id="tree-foot">
+        Walks parent_msg_id from active_branch · maps 1:1 to forkThread(throughTurnId)
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // STATE: ONE CONTINUOUS DEVELOPER WORKSPACE (sample sessions)
+    // =========================================================================
+    const SESSIONS = [
+      {
+        id: "blocked-shell",
+        name: "feat/mcp-direct",
+        status: "blocked",
+        model: "Qwen 3.8",
+        modelKey: "qwen",
+        ctx: "39K / 110K",
+        diff: { add: 18, del: 4 },
+        subtitle: "1 approval",
+        cache: "Warm 3m48s · 86%",
+        decision: {
+          kind: "shell",
+          title: "Approve this command?",
+          command: "cargo nextest run -p saint-harness-core",
+          sandbox: "WorkspaceWrite",
+          sandboxInfo: "RW: /SaintHarness, /tmp/sh · RO: /usr, ~/.cargo · Blocked: ~/.ssh, *_API_KEY scrubbed",
+          pattern: "cargo nextest *"
+        },
+        messages: [
+          { role: "user", text: "Wire McpExposure::Direct for the Saint Gateway server so mcp__saint__* tools never hide inside CodeMode." },
+          {
+            role: "activity",
+            summary: "Worked for 6.1s · 3 tools",
+            expanded: false,
+            tools: [
+              { verb: "read", arg: "mcp/router.rs", note: "outline 140L → 26L" },
+              { verb: "edit", arg: "mcp/router.rs", note: "+18 -4 · hashline 1st-try ✓", opensDiff: true },
+              { verb: "shell", arg: "cargo nextest run -p saint-harness-core", note: "awaiting approval" }
+            ]
+          }
+        ]
+      },
+      {
+        id: "blocked-ask",
+        name: "design/snapshot-api",
+        status: "blocked",
+        model: "Claude Flagship",
+        modelKey: "claude",
+        ctx: "28K / 200K",
+        diff: null,
+        subtitle: "question",
+        cache: "Warm 4m30s · 92%",
+        decision: {
+          kind: "ask",
+          title: "Which Git snapshot mode when managed by Saint Hyper Agent?",
+          options: [
+            ["Delegate to Saint Checkpointing (Recommended)", "Sets disable_internal_git_snapshot=true to avoid double I/O"],
+            ["Keep internal Shadow Git Snapshot active", "Independent 3-phase stage/clear/commit inside SaintHarness"],
+            ["Pure Rust gix read-only diff only", "Live diff patches without writing shadow commits"]
+          ]
+        },
+        messages: [
+          { role: "user", text: "Align SaintHarness shadow snapshot lifecycle with Saint Hyper Agent's workspace checkpointing." },
+          {
+            role: "activity",
+            summary: "Worked for 3.2s · 2 tools",
+            expanded: false,
+            tools: [
+              { verb: "read", arg: "core/src/snapshot.rs", note: "84 lines" },
+              { verb: "ask_user", arg: "1 question", note: "waiting for input" }
+            ]
+          }
+        ]
+      },
+      {
+        id: "working-live",
+        name: "refactor/hashline",
+        status: "working",
+        model: "Qwen 3.8",
+        modelKey: "qwen",
+        ctx: "52K / 110K",
+        diff: { add: 31, del: 12 },
+        subtitle: "running tests…",
+        cache: "Warm 4m45s · 90%",
+        messages: [
+          { role: "user", text: "Add ±4 line self-healing context snippet to StaleAnchorError and benchmark multi-edit bottom-up apply." },
+          {
+            role: "activity",
+            summary: "Working… · 4 tools (running cargo nextest)",
+            working: true,
+            expanded: true,
+            tools: [
+              { verb: "read", arg: "edit/src/hashline.rs", note: "[Unchanged · delta 0B]" },
+              { verb: "edit", arg: "edit/src/hashline.rs", note: "+31 -12 · imara-diff ✓", opensDiff: true },
+              { verb: "lint", arg: "tree-sitter", note: "0 errors (0.3ms)" },
+              { verb: "shell", arg: "cargo nextest run -p saint-harness-edit", note: "running · 1.4s · type below to steer" }
+            ]
+          }
+        ]
+      },
+      {
+        id: "done-wal",
+        name: "fix/wal-lock",
+        status: "done",
+        model: "Qwen 3.8",
+        modelKey: "qwen",
+        ctx: "48K / 110K",
+        diff: { add: 24, del: 6 },
+        subtitle: "done",
+        cache: "Warm 4m12s · 88%",
+        messages: [
+          { role: "user", text: "Fix SQLITE_BUSY under 32 concurrent Tokio writers in store/writer.rs and verify contiguous sequences 1..1000." },
+          {
+            role: "activity",
+            summary: "Worked for 9.4s · 5 tools",
+            expanded: false,
+            tools: [
+              { verb: "repo_map", arg: "14 symbols", note: "1,500 tok budget · 11ms" },
+              { verb: "read", arg: "store/writer.rs", note: "outline 184L → 32L (83% saved)" },
+              { verb: "read", arg: "store/bus.rs", note: "[Unchanged · delta 0B]" },
+              { verb: "edit", arg: "store/writer.rs", note: "+24 -6 · hashline 1st-try ✓", opensDiff: true },
+              { verb: "shell", arg: "cargo nextest run -p saint-harness-core", note: "exit 0 · 1.8s · 412L→14L" }
+            ]
+          },
+          {
+            role: "assistant",
+            text: "Switched the dedicated <code>sh-sqlite-writer</code> thread to <code>TransactionBehavior::Immediate</code> with a <code>5000ms</code> busy timeout, committing event + projector + commit hooks in one atomic transaction before broadcasting SSE.\n\nVerified 32 concurrent Tokio tasks writing 1,000 events with contiguous <code>seq 1..1000</code> and zero <code>SQLITE_BUSY</code> errors.",
+            meta: "48.2K tok · 88% cached · ↓74% condensed · $0.014"
+          }
+        ]
+      },
+      {
+        id: "idle-new",
+        name: "new session",
+        status: "idle",
+        model: "Qwen 3.8",
+        modelKey: "qwen",
+        ctx: "0 / 110K",
+        diff: null,
+        subtitle: "main",
+        cache: "Cold · 0%",
+        messages: []
+      }
+    ];
+
+    let activeId = "done-wal";
+    let boardOpen = false;
+    let planMode = false;
+    let runtimeMode = "approval-required"; // "approval-required" | "auto" | "full-access" (1-to-1 SHA RuntimeMode)
+    let daemonState = "ok"; // "ok" | "loading" | "error"  (session list states)
+    const SPIN = ["⠋","⠙","⠹","⠸","⠼","⠴","⠦","⠧","⠇","⠏"];
+    let spinIdx = 0;
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const narrow = window.matchMedia("(max-width: 820px)");
+
+    // The spinner marks a session that is really running. Under reduced motion it holds one frame.
+    setInterval(() => {
+      if (reduceMotion.matches) return;
+      spinIdx = (spinIdx + 1) % SPIN.length;
+      document.querySelectorAll(".live-spin").forEach(el => el.textContent = SPIN[spinIdx]);
+    }, 65);
+
+    const esc = v => String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    function currentSession() { return SESSIONS.find(s => s.id === activeId); }
+
+    // =========================================================================
+    // RENDER SIDEBAR (Attention-First Agent Status Grouping)
+    // =========================================================================
+    function renderDaemonStatus() {
+      const el = document.getElementById("daemon-status");
+      if (daemonState === "error") {
+        el.innerHTML = `<span class="dot error" aria-hidden="true"></span> <span class="ink-error">daemon offline</span>`;
+        el.title = "Cannot reach the SaintHarness daemon";
+      } else if (daemonState === "loading") {
+        el.innerHTML = `<span class="dot idle" aria-hidden="true"></span> connecting…`;
+        el.title = "Connecting to the SaintHarness daemon";
+      } else {
+        el.innerHTML = `<span class="dot done" aria-hidden="true"></span> wal · 11ms`;
+        el.title = "SQLite WAL daemon reachable (sample cold start)";
+      }
+    }
+
+    function retryDaemon() {
+      daemonState = "loading";
+      renderAll();
+      setTimeout(() => { daemonState = "ok"; renderAll(); }, 900);
+    }
+
+    function renderSidebar() {
+      const box = document.getElementById("sb-list");
+      box.innerHTML = "";
+      box.setAttribute("aria-busy", daemonState === "loading" ? "true" : "false");
+      renderDaemonStatus();
+
+      if (daemonState === "loading") {
+        box.innerHTML = `<div class="sb-state" role="status">Loading sessions from the daemon…</div>
+          <div class="sb-skeleton"></div><div class="sb-skeleton"></div><div class="sb-skeleton"></div>`;
+        return;
+      }
+      if (daemonState === "error") {
+        box.innerHTML = `<div class="sb-state" role="alert">
+            <strong>Can't reach the daemon</strong>
+            <span>Nothing answered on 127.0.0.1:3774. Your sessions are safe on disk; start it with <code>saint-harness server</code>, then retry.</span>
+            <button class="icon-btn active" id="btn-daemon-retry">Retry connection</button>
+          </div>`;
+        box.querySelector("#btn-daemon-retry").addEventListener("click", retryDaemon);
+        return;
+      }
+      if (!SESSIONS.length) {
+        box.innerHTML = `<div class="sb-state"><strong>No sessions yet</strong><span>Press + or type a prompt below to start one.</span></div>`;
+        return;
+      }
+
+      const groups = [
+        { key: "blocked", label: "Needs you" },
+        { key: "working", label: "Working" },
+        { key: "done", label: "Ready" },
+        { key: "idle", label: "Idle" }
+      ];
+
+      groups.forEach(g => {
+        const items = SESSIONS.filter(s => s.status === g.key);
+        if (!items.length) return;
+        const wrap = document.createElement("div");
+        wrap.innerHTML = `<div class="sb-group-label"><span>${g.label}</span><span>${items.length}</span></div>`;
+        items.forEach(s => {
+          const btn = document.createElement("button");
+          const isCurrent = s.id === activeId && !boardOpen;
+          btn.className = "sb-item" + (isCurrent ? " active" : "");
+          if (isCurrent) btn.setAttribute("aria-current", "page");
+          btn.setAttribute("aria-label", `${s.name}, ${g.label}, ${s.model}`);
+          const glyph = s.status === "working"
+            ? `<span class="sb-spin live-spin" aria-hidden="true">${SPIN[spinIdx]}</span>`
+            : `<span class="dot ${s.status}" aria-hidden="true"></span>`;
+          const rightMeta = s.status === "blocked"
+            ? `<span class="sb-needs">${s.subtitle}</span>`
+            : s.diff
+              ? `<span><span class="sb-diff-add">+${s.diff.add}</span> <span class="sb-diff-del">-${s.diff.del}</span></span>`
+              : `<span>${s.subtitle}</span>`;
+          btn.innerHTML = `
+            <div class="sb-row1">${glyph}<span class="sb-title">${esc(s.name)}</span></div>
+            <div class="sb-row2"><span>${esc(s.model)}</span>${rightMeta}</div>
+          `;
+          btn.addEventListener("click", () => {
+            boardOpen = false;
+            activeId = s.id;
+            if (narrow.matches) setSidebar(false);
+            renderAll();
+          });
+          wrap.appendChild(btn);
+        });
+        box.appendChild(wrap);
+      });
+    }
+
+    // =========================================================================
+    // RENDER MAIN SESSION (Landing OR Calm Transcript + Detached Card)
+    // =========================================================================
+    function renderMain() {
+      const s = currentSession();
+      document.getElementById("hdr-session-name").textContent = s.name;
+      document.getElementById("hdr-model-label").textContent = s.model;
+      document.getElementById("hdr-cache-label").textContent = s.cache;
+      document.getElementById("hdr-cache-dot").className = "dot " + (s.cache.startsWith("Warm") ? "done" : "idle");
+      document.getElementById("foot-ctx").textContent = s.ctx;
+
+      const diffBtn = document.getElementById("btn-diff");
+      if (s.diff) {
+        diffBtn.style.display = "inline-flex";
+        diffBtn.innerHTML = `<span class="sb-diff-add">+${s.diff.add}</span><span class="sb-diff-del">-${s.diff.del}</span>`;
+      } else {
+        diffBtn.style.display = "none";
+      }
+
+      const ds = document.getElementById("drawer-diff-stat");
+      ds.innerHTML = s.diff ? `<span class="sb-diff-add">+${s.diff.add}</span> <span class="sb-diff-del">-${s.diff.del}</span>` : "";
+      renderDiff();
+
+      const boardBtn = document.getElementById("btn-board");
+      boardBtn.classList.toggle("active", boardOpen);
+      boardBtn.setAttribute("aria-pressed", String(boardOpen));
+      document.getElementById("board-view").classList.toggle("open", boardOpen);
+      document.getElementById("focus-view").style.display = boardOpen ? "none" : "flex";
+      if (boardOpen) { renderBoard(); return; }
+
+      const isLanding = s.messages.length === 0;
+      document.getElementById("landing-pane").style.display = isLanding ? "flex" : "none";
+      document.getElementById("transcript").style.display = isLanding ? "none" : "flex";
+      if (isLanding && !wasLanding) { resizeWave(); wakeWave(5000); }
+      wasLanding = isLanding;
+
+      const tr = document.getElementById("transcript");
+      tr.innerHTML = "";
+      s.messages.forEach((m, idx) => {
+        if (m.role === "user") {
+          const d = document.createElement("div");
+          d.className = "user-msg";
+          d.textContent = m.text;
+          tr.appendChild(d);
+        } else if (m.role === "handoff") {
+          const d = document.createElement("div");
+          d.className = "handoff-divider";
+          d.textContent = m.text;
+          tr.appendChild(d);
+        } else if (m.role === "activity") {
+          const blk = document.createElement("div");
+          blk.className = "activity-block";
+          const btn = document.createElement("button");
+          btn.className = "activity-summary";
+          btn.setAttribute("aria-expanded", String(!!m.expanded));
+          const lead = m.working ? `<span class="live-spin" style="color:var(--status-working)" aria-hidden="true">${SPIN[spinIdx]}</span>` : `<span class="caret" aria-hidden="true">${m.expanded ? "▾" : "▸"}</span>`;
+          btn.innerHTML = `${lead}<span>${esc(m.summary)}</span>`;
+          const tree = document.createElement("div");
+          tree.className = "activity-tree" + (m.expanded ? "" : " collapsed");
+          m.tools.forEach(t => {
+            const row = document.createElement("div");
+            row.className = "tool-line";
+            // Only args that open something are buttons (and Ember); the rest stay plain text.
+            const arg = t.opensDiff
+              ? `<button class="t-arg" title="Open in split diff">${esc(t.arg)}</button>`
+              : `<span class="t-arg">${esc(t.arg)}</span>`;
+            row.innerHTML = `<span class="t-verb">${esc(t.verb)}</span>${arg}<span class="t-note">${esc(t.note)}</span>`;
+            if (t.opensDiff) row.querySelector(".t-arg").addEventListener("click", () => toggleDiff(true));
+            tree.appendChild(row);
+          });
+          // Toggle in place so keyboard focus stays on the summary.
+          btn.addEventListener("click", () => {
+            m.expanded = !m.expanded;
+            tree.classList.toggle("collapsed", !m.expanded);
+            btn.setAttribute("aria-expanded", String(m.expanded));
+            const caret = btn.querySelector(".caret");
+            if (caret) caret.textContent = m.expanded ? "▾" : "▸";
+          });
+          blk.appendChild(btn);
+          blk.appendChild(tree);
+          tr.appendChild(blk);
+        } else if (m.role === "assistant") {
+          const d = document.createElement("div");
+          d.className = "assistant-msg";
+          d.innerHTML = m.text.split("\n\n").map(p => `<p>${p}</p>`).join("");
+          if (m.meta) {
+            const meta = document.createElement("div");
+            meta.className = "msg-meta";
+            meta.innerHTML = `<span>${m.meta}</span><button data-act="diff">Review diff</button><button data-act="tree">Fork here</button>`;
+            meta.querySelector('[data-act="diff"]').addEventListener("click", () => toggleDiff(true));
+            meta.querySelector('[data-act="tree"]').addEventListener("click", () => openTreeModal());
+            d.appendChild(meta);
+          }
+          tr.appendChild(d);
+        }
+      });
+
+      // Render detached decision card ONLY when session is blocked
+      const dslot = document.getElementById("decision-slot");
+      dslot.innerHTML = "";
+      if (s.status === "blocked" && s.decision) {
+        const card = document.createElement("div");
+        card.className = "decision-card";
+        if (s.decision.kind === "shell") {
+          card.innerHTML = `
+            <div class="decision-top">
+              <div class="decision-title">${s.decision.title}</div>
+              <button class="sandbox-pill" id="toggle-sb-info" aria-expanded="false" aria-controls="sb-detail-box" title="Show sandbox scope">⛨ ${s.decision.sandbox} ▾</button>
+            </div>
+            <div class="decision-cmd"><span>$ ${s.decision.command}</span></div>
+            <div class="sandbox-detail" id="sb-detail-box">${s.decision.sandboxInfo}</div>
+            <div>
+              <button class="choice-row primary" data-dec="once"><span class="choice-num">1</span><span class="choice-label">Approve once</span><span class="choice-desc">Run this command</span></button>
+              <button class="choice-row" data-dec="always"><span class="choice-num">2</span><span class="choice-label">Always allow this session</span><span class="choice-desc">Save \`${s.decision.pattern}\`</span></button>
+              <button class="choice-row destructive" data-dec="decline"><span class="choice-num">3</span><span class="choice-label">Decline</span><span class="choice-desc">Let agent try another approach</span></button>
+              <button class="choice-row" data-dec="cancel"><span class="choice-num">4</span><span class="choice-label">Cancel turn</span><span class="choice-desc">Stop turn (UserDeclined)</span></button>
+            </div>
+          `;
+          card.querySelector("#toggle-sb-info").addEventListener("click", (e) => {
+            const open = card.querySelector("#sb-detail-box").classList.toggle("open");
+            e.currentTarget.setAttribute("aria-expanded", String(open));
+          });
+          card.querySelectorAll(".choice-row").forEach(r => r.addEventListener("click", () => resolveDecision(s, r.dataset.dec)));
+        } else if (s.decision.kind === "ask") {
+          card.innerHTML = `
+            <div class="decision-top">
+              <div class="decision-title">${s.decision.title}</div>
+              <span class="mono" style="font-size:10.5px;color:var(--status-working-ink)">ask_user</span>
+            </div>
+            <div>
+              ${s.decision.options.map((o, i) => `
+                <button class="choice-row ${i === 0 ? "primary" : ""}" data-opt="${esc(o[0])}">
+                  <span class="choice-num">${i + 1}</span>
+                  <span class="choice-label">${o[0]}</span>
+                  <span class="choice-desc">${o[1]}</span>
+                </button>
+              `).join("")}
+            </div>
+          `;
+          card.querySelectorAll(".choice-row").forEach(r => r.addEventListener("click", () => resolveAsk(s, r.dataset.opt)));
+        }
+        dslot.appendChild(card);
+      }
+
+      tr.scrollTop = tr.scrollHeight;
+    }
+
+    // Resolving a decision updates the agent sidebar status LIVE!
+    function resolveDecision(s, dec) {
+      s.decision = null;
+      if (dec === "cancel") {
+        s.status = "done";
+        s.subtitle = "stopped";
+        s.messages.push({ role: "assistant", text: "Turn stopped via <code>ToolOutcome::UserDeclined</code>. No command was executed.", meta: "Law #4 · UserDeclined" });
+        renderAll();
+        return;
+      }
+      if (dec === "decline") {
+        s.status = "done";
+        s.subtitle = "adjusted";
+        s.messages.push({ role: "assistant", text: "Command declined. Skipped <code>cargo nextest</code> and kept the patch staged for you to check by hand.", meta: "RecoverableError::CorrectedError" });
+        renderAll();
+        return;
+      }
+      s.status = "working";
+      s.subtitle = "running…";
+      const lastAct = s.messages[s.messages.length - 1];
+      if (lastAct && lastAct.role === "activity") {
+        lastAct.working = true;
+        lastAct.summary = "Running cargo nextest…";
+      }
+      renderAll();
+      setTimeout(() => {
+        s.status = "done";
+        s.subtitle = "done";
+        if (lastAct && lastAct.role === "activity") {
+          lastAct.working = false;
+          lastAct.summary = "Worked for 7.9s · 3 tools";
+          lastAct.tools[2].note = dec === "always" ? "exit 0 · pattern saved ✓" : "exit 0 · 1.6s";
+        }
+        s.messages.push({
+          role: "assistant",
+          text: "Wired <code>McpExposure::Direct</code> for the <code>saint</code> gateway server (in-memory bearer only, scrubbed from shell env). All 18 tests in <code>saint-harness-core</code> passed.",
+          meta: "39.4K tok · 86% cached · $0.009"
+        });
+        renderAll();
+      }, 950);
+    }
+
+    function resolveAsk(s, choice) {
+      s.decision = null;
+      s.status = "done";
+      s.subtitle = "done";
+      s.messages.push({ role: "user", text: choice });
+      s.messages.push({
+        role: "assistant",
+        text: `Applied: <code>${esc(choice)}</code>. Added it to the session start options in <code>saint-harness-protocol</code>, so Saint Hyper Agent sends it on <code>POST /sessions</code>.`,
+        meta: "29.1K tok · 92% cached · $0.018"
+      });
+      renderAll();
+    }
+
+    // =========================================================================
+    // AGENT BOARD VIEW (Ctrl+G)
+    // =========================================================================
+    function renderBoard() {
+      const grid = document.getElementById("board-grid");
+      grid.innerHTML = "";
+      const cols = [
+        { title: "Needs you", dot: "blocked", filter: s => s.status === "blocked", empty: "Nothing is waiting on you. Approvals and agent questions land here." },
+        { title: "Working", dot: "working", filter: s => s.status === "working", empty: "No session is running. Send a prompt to start one." },
+        { title: "Ready / Idle", dot: "done", filter: s => s.status === "done" || s.status === "idle", empty: "Finished sessions show up here with their diff." }
+      ];
+      cols.forEach(col => {
+        const items = SESSIONS.filter(col.filter);
+        const el = document.createElement("div");
+        el.className = "board-col";
+        el.innerHTML = `<div class="board-col-head"><span><span class="dot ${col.dot}" style="margin-right:6px;" aria-hidden="true"></span>${col.title}</span><span>${items.length}</span></div>`;
+        if (!items.length) {
+          const empty = document.createElement("div");
+          empty.className = "board-empty";
+          empty.textContent = col.empty;
+          el.appendChild(empty);
+        }
+        items.forEach(s => {
+          const card = document.createElement("button");
+          card.className = "board-card";
+          const summary = s.decision ? s.decision.title : (s.messages[0]?.text || "Empty session. Type a prompt to start it.");
+          card.innerHTML = `
+            <div class="board-card-title">${esc(s.name)}</div>
+            <div class="board-card-sub">${esc(summary.slice(0, 88))}${summary.length > 88 ? "…" : ""}</div>
+            <div class="board-card-meta"><span>${esc(s.model)} · ${s.ctx}</span><span>${s.cache}</span></div>
+          `;
+          card.addEventListener("click", () => {
+            activeId = s.id;
+            boardOpen = false;
+            renderAll();
+          });
+          el.appendChild(card);
+        });
+        grid.appendChild(el);
+      });
+    }
+
+    function renderAll() {
+      renderSidebar();
+      renderMain();
+      renderCli();
+    }
+
+    // =========================================================================
+    // COMPOSER INPUT: SEND, STEER, AND INLINE /, @, $ PALETTE
+    // =========================================================================
+    const inputEl = document.getElementById("composer-input");
+    const popoverEl = document.getElementById("inline-popover");
+    const popListEl = document.getElementById("pop-list");
+    const popTitleEl = document.getElementById("pop-title");
+
+    const PALETTE_ITEMS = {
+      "/": [
+        { k: "/plan", desc: "Switch to read-only Plan mode (Landlock RO)", act: () => { planMode = !planMode; updateModePill(); } },
+        { k: "/auto", desc: "Enable Auto mode (sandboxed workspace auto-approve)", act: () => setRuntimeMode("auto") },
+        { k: "/bypass", desc: "Enable Bypass permissions / Full access (no prompts, no sandbox)", act: () => setRuntimeMode("full-access") },
+        { k: "/supervised", desc: "Return to Ask for approval mode", act: () => setRuntimeMode("approval-required") },
+        { k: "/diff", desc: "Toggle Right Split Diff drawer (Ctrl+D)", act: () => toggleDiff() },
+        { k: "/btw", desc: "Open ephemeral warm-cache sidechat (Ctrl+Alt+S)", act: () => toggleBtw(true) },
+        { k: "/tree", desc: "Open Session DAG branch switcher (Ctrl+T)", act: () => openTreeModal() },
+        { k: "/board", desc: "Switch to Agent Board overview (Ctrl+G)", act: () => { boardOpen = true; renderAll(); } },
+        { k: "/model", desc: "Switch model / Cross-Model Handoff", act: () => togglePopover("model-popover") },
+        { k: "/compact", desc: "Run Tier 1 zero-LLM shake compaction", act: () => runCompact() },
+        { k: "/cli", desc: "Toggle bottom headless CLI drawer (Ctrl+J)", act: () => toggleCli() },
+        { k: "/offline", desc: "Prototype: show the daemon-unreachable state", act: () => { daemonState = "error"; setSidebar(true); renderAll(); } }
+      ],
+      "@": [
+        { k: "@store/writer.rs", desc: "Single SQLite WAL writer thread", insert: "@crates/saint-harness-core/src/store/writer.rs " },
+        { k: "@edit/hashline.rs", desc: "FNV-1a 2-char anchor bottom-up apply", insert: "@crates/saint-harness-edit/src/hashline.rs " },
+        { k: "@ai/catalog.rs", desc: "Dynamic ModelResolver (0 hardcode)", insert: "@crates/saint-harness-ai/src/catalog.rs " },
+        { k: "@shell/sandbox_linux.rs", desc: "Async-signal-safe Landlock V3", insert: "@crates/saint-harness-shell/src/sandbox_linux.rs " }
+      ],
+      "$": [
+        { k: "$rust-perf-audit", desc: "Project skill · .saint-harness/skills", insert: "$rust-perf-audit " },
+        { k: "$saint-bridge", desc: "User skill · SHA adapter conformance", insert: "$saint-bridge " },
+        { k: "$mcp:saint", desc: "Direct gateway tools (auto-approved)", insert: "$mcp:saint " }
+      ]
+    };
+
+    let popItems = [], popIdx = 0;
+    function closeInlinePopover() {
+      popoverEl.classList.remove("open");
+      inputEl.setAttribute("aria-expanded", "false");
+      popItems = [];
+    }
+    function runPopItem(it) {
+      closeInlinePopover();
+      if (it.act) { inputEl.value = ""; it.act(); }
+      else { inputEl.value = it.insert; inputEl.focus(); }
+    }
+    function highlightPop() {
+      popListEl.querySelectorAll(".pop-row").forEach((r, i) => {
+        r.classList.toggle("active", i === popIdx);
+        r.setAttribute("aria-selected", String(i === popIdx));
+        if (i === popIdx) r.scrollIntoView({ block: "nearest" });
+      });
+    }
+    function updateInlinePopover() {
+      const val = inputEl.value;
+      const prefix = val[0];
+      if (prefix !== "/" && prefix !== "@" && prefix !== "$") { closeInlinePopover(); return; }
+      const q = val.slice(1).toLowerCase();
+      popItems = PALETTE_ITEMS[prefix].filter(i => (i.k + " " + i.desc).toLowerCase().includes(q));
+      popIdx = 0;
+      popTitleEl.textContent = prefix === "/" ? "Slash commands" : prefix === "@" ? "Files (nucleo-matcher)" : "Skills & MCP";
+      popListEl.innerHTML = "";
+      if (!popItems.length) {
+        const empty = document.createElement("div");
+        empty.className = "pop-empty";
+        empty.textContent = `No match for "${val}". Esc to close, or keep typing to send it as a message.`;
+        popListEl.appendChild(empty);
+      }
+      popItems.forEach((it, idx) => {
+        const b = document.createElement("button");
+        b.className = "pop-row";
+        b.setAttribute("role", "option");
+        b.tabIndex = -1;
+        b.innerHTML = `<span><b style="color:var(--ink)">${esc(it.k)}</b><span class="sub">${esc(it.desc)}</span></span>`;
+        b.addEventListener("click", () => runPopItem(it));
+        popListEl.appendChild(b);
+      });
+      highlightPop();
+      popoverEl.classList.add("open");
+      inputEl.setAttribute("aria-expanded", "true");
+    }
+
+    inputEl.addEventListener("input", updateInlinePopover);
+
+    function submitComposer(textOverride) {
+      const text = (textOverride ?? inputEl.value).trim();
+      if (!text) return;
+      closeInlinePopover();
+
+      // Execute slash command directly if exact match
+      if (text.startsWith("/")) {
+        const match = PALETTE_ITEMS["/"].find(i => i.k === text.split(" ")[0]);
+        if (match) { inputEl.value = ""; match.act(); return; }
+      }
+
+      const s = currentSession();
+      inputEl.value = "";
+
+      // Session is running: queue a steer instead of interrupting (keeps the cache prefix).
+      if (s.status === "working") {
+        document.getElementById("steer-text").textContent = `Steer queued: "${text}". Sent after the current tool finishes.`;
+        document.getElementById("steer-strip").classList.add("open");
+        return;
+      }
+
+      // Idle/landing session: start working in place.
+      if (s.status === "idle") {
+        s.name = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 22) || "session";
+      }
+      s.status = "working";
+      s.subtitle = "working…";
+      s.messages.push({ role: "user", text });
+      const act = {
+        role: "activity",
+        summary: "Working… · mapping repo & running tools",
+        working: true,
+        expanded: true,
+        tools: [
+          { verb: "repo_map", arg: "1,500 tok", note: "ranking symbols…" }
+        ]
+      };
+      s.messages.push(act);
+      renderAll();
+
+      setTimeout(() => {
+        act.tools[0].note = "12 symbols ranked (9ms)";
+        act.tools.push({ verb: "edit", arg: "store/writer.rs", note: "+14 -2 · hashline ✓", opensDiff: true });
+        renderMain();
+      }, 600);
+
+      setTimeout(() => {
+        act.working = false;
+        act.expanded = false;
+        act.summary = "Worked for 4.2s · 2 tools";
+        s.status = "done";
+        s.subtitle = "done";
+        s.diff = s.diff || { add: 14, del: 2 };
+        s.cache = "Warm 4m58s · 89%";
+        s.ctx = "18K / 110K";
+        s.messages.push({
+          role: "assistant",
+          text: `Done: <code>${esc(text)}</code>. Wrote the edit through <code>FileWriteCoordinator</code>; tree-sitter and LSP reported no errors.`,
+          meta: "18.4K tok · 89% cached · $0.004"
+        });
+        renderAll();
+      }, 1400);
+    }
+
+    inputEl.addEventListener("keydown", e => {
+      const popOpen = popoverEl.classList.contains("open") && popItems.length > 0;
+      if (popOpen && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+        e.preventDefault();
+        popIdx = (popIdx + (e.key === "ArrowDown" ? 1 : -1) + popItems.length) % popItems.length;
+        highlightPop();
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        if (popOpen) runPopItem(popItems[popIdx]);
+        else submitComposer();
+      }
+      if (e.key === "Escape") closeInlinePopover();
+    });
+
+    function runCompact() {
+      const s = currentSession();
+      if (!s.messages.length) return;
+      s.messages.push({ role: "handoff", text: "Tier 1 shake: 3 stale tool outputs masked, no LLM call (sample)" });
+      renderMain();
+    }
+    document.getElementById("btn-send").addEventListener("click", () => submitComposer());
+    document.getElementById("steer-clear").addEventListener("click", () => document.getElementById("steer-strip").classList.remove("open"));
+    document.querySelectorAll(".quiet-prompt").forEach(b => b.addEventListener("click", () => submitComposer(b.dataset.prompt)));
+
+    function updateModePill() {
+      const p = document.getElementById("pill-mode");
+      p.textContent = planMode ? "Plan" : "Build";
+      p.className = planMode ? "quiet-pill plan" : "quiet-pill";
+      p.setAttribute("aria-pressed", String(planMode));
+    }
+    document.getElementById("pill-mode").addEventListener("click", () => { planMode = !planMode; updateModePill(); });
+
+    const ACCESS_UI = {
+      "approval-required": { text: "○ Ask for approval ▾", cls: "quiet-pill" },
+      "auto": { text: "● Auto mode ▾", cls: "quiet-pill auto" },
+      "full-access": { text: "▲ Bypass permissions ▾", cls: "quiet-pill full" }
+    };
+    const accessPop = document.getElementById("access-popover");
+    const accessPill = document.getElementById("pill-access");
+    function setAccessPop(open) {
+      accessPop.classList.toggle("open", open);
+      accessPill.setAttribute("aria-expanded", String(open));
+      if (open) (accessPop.querySelector(".access-opt.active") || accessPop.querySelector(".access-opt")).focus();
+    }
+    function setRuntimeMode(mode) {
+      runtimeMode = mode;
+      accessPill.textContent = ACCESS_UI[mode].text;
+      accessPill.className = ACCESS_UI[mode].cls;
+      accessPop.querySelectorAll(".access-opt").forEach(b => {
+        b.classList.toggle("active", b.dataset.rmode === mode);
+        b.setAttribute("aria-checked", String(b.dataset.rmode === mode));
+      });
+      if (accessPop.classList.contains("open")) { setAccessPop(false); accessPill.focus(); }
+      // If active session is blocked on a safe workspace permission & user switched to Auto or Bypass, auto-resolve it!
+      const s = currentSession();
+      if (s && s.status === "blocked" && s.decision && s.decision.kind === "shell" && (mode === "auto" || mode === "full-access")) {
+        resolveDecision(s, mode === "full-access" ? "always" : "once");
+      }
+    }
+    accessPill.addEventListener("click", () => setAccessPop(!accessPop.classList.contains("open")));
+    accessPop.querySelectorAll(".access-opt").forEach(b =>
+      b.addEventListener("click", () => setRuntimeMode(b.dataset.rmode))
+    );
+
+    // =========================================================================
+    // DRAWERS & POPOVERS (Progressive Disclosure)
+    // =========================================================================
+    function toggleDiff(force) {
+      const d = document.getElementById("diff-drawer");
+      const open = force !== undefined ? force : !d.classList.contains("open");
+      d.classList.toggle("open", open);
+      const b = document.getElementById("btn-diff");
+      b.classList.toggle("active", open);
+      b.setAttribute("aria-expanded", String(open));
+      if (open && narrow.matches) document.getElementById("btn-close-diff").focus();
+    }
+    function toggleCli(force) {
+      const d = document.getElementById("cli-drawer");
+      const open = force !== undefined ? force : !d.classList.contains("open");
+      d.classList.toggle("open", open);
+      const b = document.getElementById("btn-cli");
+      b.classList.toggle("active", open);
+      b.setAttribute("aria-expanded", String(open));
+    }
+    const POPOVER_TRIGGERS = { "cache-popover": "btn-cache", "model-popover": "btn-model" };
+    function togglePopover(id) {
+      Object.entries(POPOVER_TRIGGERS).forEach(([pid, tid]) => {
+        const el = document.getElementById(pid);
+        const open = pid === id ? !el.classList.contains("open") : false;
+        el.classList.toggle("open", open);
+        document.getElementById(tid).setAttribute("aria-expanded", String(open));
+        // Re-render on open so the current session's model is the highlighted row.
+        if (open && pid === "model-popover") renderModelTree();
+        if (open) { const f = el.querySelector(".pop-row.active, button"); if (f) f.focus(); }
+      });
+    }
+    function setSidebar(open) {
+      document.getElementById("sidebar").classList.toggle("collapsed", !open);
+      const b = document.getElementById("btn-sidebar");
+      b.classList.toggle("active", open);
+      b.setAttribute("aria-expanded", String(open));
+    }
+    function toggleBtw(force) {
+      const el = document.getElementById("btw-sheet");
+      const open = force !== undefined ? force : !el.classList.contains("open");
+      el.classList.toggle("open", open);
+      if (open) document.getElementById("btw-input").focus();
+    }
+
+    document.getElementById("btn-sidebar").addEventListener("click", () => {
+      setSidebar(document.getElementById("sidebar").classList.contains("collapsed"));
+    });
+    document.getElementById("sb-scrim").addEventListener("click", () => setSidebar(false));
+    // Phones and narrow panes start with the rail closed so the transcript gets the width.
+    if (narrow.matches) setSidebar(false);
+    function newSession() {
+      boardOpen = false;
+      activeId = "idle-new";
+      if (narrow.matches) setSidebar(false);
+      renderAll();
+      inputEl.focus();
+    }
+    document.getElementById("btn-new-session").addEventListener("click", newSession);
+    document.getElementById("btn-board").addEventListener("click", () => { boardOpen = !boardOpen; renderAll(); });
+    document.getElementById("btn-close-board").addEventListener("click", () => { boardOpen = false; renderAll(); });
+    document.getElementById("btn-diff").addEventListener("click", () => toggleDiff());
+    document.getElementById("btn-close-diff").addEventListener("click", () => toggleDiff(false));
+    document.getElementById("btn-cli").addEventListener("click", () => toggleCli());
+    document.getElementById("btn-close-cli").addEventListener("click", () => toggleCli(false));
+    document.getElementById("btn-cache").addEventListener("click", () => togglePopover("cache-popover"));
+    document.getElementById("btn-model").addEventListener("click", () => togglePopover("model-popover"));
+    document.getElementById("btn-close-btw").addEventListener("click", () => toggleBtw(false));
+    document.getElementById("btn-theme").addEventListener("click", () => document.documentElement.classList.toggle("dark"));
+    document.getElementById("btn-font-mode").addEventListener("click", (e) => {
+      const pure = document.documentElement.classList.toggle("pure-tui-mode");
+      e.currentTarget.textContent = pure ? "TUI" : "SHA";
+      e.currentTarget.classList.toggle("active", pure);
+      e.currentTarget.setAttribute("aria-pressed", String(pure));
+    });
+    document.getElementById("btn-mono-face").addEventListener("click", (e) => {
+      const sf = document.documentElement.classList.toggle("sf-mono-first");
+      e.currentTarget.textContent = sf ? "SF" : "JB";
+      e.currentTarget.classList.toggle("active", sf);
+      e.currentTarget.setAttribute("aria-pressed", String(sf));
+    });
+
+    // Cross-Model Handoff inside active session
+    // Leaves switch directly; Claude / Gemini expand into a tree loaded from
+    // the provider catalog (ModelResolver, no hardcoded versions in the harness).
+    const MODEL_TREE = [
+      { key: "qwen", name: "Qwen 3.8", label: "Qwen 3.8 27B", tag: "hashline · local",
+        note: "Switched to Qwen 3.8 27B · SGLang Radix prefix warm · Hashline" },
+      { key: "qwen4", name: "Qwen 4", label: "Qwen 4", tag: "latest_family",
+        note: "Switched to Qwen 4 (latest_family:qwen4) · DashScope cache" },
+      { key: "claude", label: "Claude", tag: "Inline4 cache", provider: true, catalog: "Anthropic",
+        handoff: "Inline4 breakpoints · foreign thinking stripped",
+        children: [
+          { key: "claude", name: "Claude Flagship", label: "Auto", sel: "latest_flagship" },
+          { key: "claude-fable-5-2", name: "Claude Fable 5.2", label: "Fable 5.2", sel: "claude-fable-5-2" },
+          { key: "claude-opus-5-5", name: "Claude Opus 5.5", label: "Opus 5.5", sel: "claude-opus-5-5" },
+          { key: "claude-sonnet-5-5", name: "Claude Sonnet 5.5", label: "Sonnet 5.5", sel: "claude-sonnet-5-5" },
+          { key: "claude-haiku-5-5", name: "Claude Haiku 5.5", label: "Haiku 5.5", sel: "claude-haiku-5-5" }
+        ] },
+      { key: "gemini", label: "Gemini", tag: "implicit cache", provider: true, catalog: "Google",
+        handoff: "skip_thought_signature_validator active",
+        footnote: "Exact Gemini IDs resolve from the live catalog.",
+        children: [
+          { key: "gemini", name: "Gemini Flagship", label: "Auto", sel: "latest_flagship" },
+          { key: "gemini-pro", name: "Gemini Pro", label: "Pro", sel: "latest_family:gemini-pro" },
+          { key: "gemini-flash", name: "Gemini Flash", label: "Flash", sel: "latest_family:gemini-flash" }
+        ] }
+    ];
+    const catalogState = {};     // provider key -> "loading" | "loaded"
+    const expandedProviders = new Set();
+
+    function pickModel(node, provider) {
+      const s = currentSession();
+      s.model = node.name;
+      s.modelKey = node.key;
+      if (s.messages.length > 0) {
+        const note = provider ? `Handoff to ${node.name} (${node.sel}) · ${provider.handoff}` : node.note;
+        s.messages.push({ role: "handoff", text: note });
+      }
+      togglePopover("");
+      renderAll();
+      document.getElementById("btn-model").focus();
+    }
+
+    function toggleProvider(p) {
+      if (expandedProviders.has(p.key)) expandedProviders.delete(p.key);
+      else {
+        expandedProviders.add(p.key);
+        if (catalogState[p.key] !== "loaded" && daemonState !== "error") {
+          catalogState[p.key] = "loading";
+          setTimeout(() => { catalogState[p.key] = "loaded"; renderModelTree(p.key); }, 600);
+        }
+      }
+      renderModelTree(p.key);
+    }
+
+    function renderModelTree(focusKey) {
+      const box = document.getElementById("model-pick-list");
+      const current = currentSession().modelKey;
+      box.innerHTML = "";
+      const check = on => on ? `<span class="check" aria-hidden="true">✓</span>` : "";
+      MODEL_TREE.forEach((n, idx) => {
+        if (n.provider && !MODEL_TREE[idx - 1]?.provider) {
+          const sep = document.createElement("div");
+          sep.className = "model-sep";
+          box.appendChild(sep);
+        }
+        if (!n.provider) {
+          const b = document.createElement("button");
+          b.className = "pop-row";
+          if (current === n.key) b.setAttribute("aria-current", "true");
+          b.innerHTML = `<span>${esc(n.label)}${check(current === n.key)}</span><span class="tag">${esc(n.tag)}</span>`;
+          b.addEventListener("click", () => pickModel(n));
+          box.appendChild(b);
+          return;
+        }
+        const open = expandedProviders.has(n.key);
+        const holdsCurrent = n.children.some(c => c.key === current);
+        const head = document.createElement("button");
+        head.className = "pop-row model-provider";
+        head.dataset.provider = n.key;
+        head.setAttribute("aria-expanded", String(open));
+        head.setAttribute("aria-controls", "models-" + n.key);
+        head.innerHTML = `<span><span class="caret" aria-hidden="true">${open ? "▼" : "▶"}</span>${esc(n.label)}${check(holdsCurrent && !open)}</span><span class="tag">${esc(n.tag)}</span>`;
+        head.addEventListener("click", () => toggleProvider(n));
+        box.appendChild(head);
+        if (!open) return;
+
+        const group = document.createElement("div");
+        group.id = "models-" + n.key;
+        group.className = "model-group";
+        group.setAttribute("role", "group");
+        group.setAttribute("aria-label", `${n.label} models`);
+        if (daemonState === "error") {
+          group.innerHTML = `<div class="model-state" role="alert"><span class="ink-error">Can't load the ${esc(n.catalog)} catalog: the daemon is offline.</span></div>`;
+          const r = document.createElement("button");
+          r.className = "icon-btn active";
+          r.textContent = "Retry";
+          r.addEventListener("click", () => { retryDaemon(); setTimeout(() => { catalogState[n.key] = undefined; expandedProviders.delete(n.key); toggleProvider(n); }, 950); });
+          group.firstChild.appendChild(r);
+        } else if (catalogState[n.key] === "loading") {
+          group.innerHTML = `<div class="model-state" role="status">Loading ${esc(n.label)} models from the ${esc(n.catalog)} catalog…</div>`;
+        } else {
+          n.children.forEach(c => {
+            const b = document.createElement("button");
+            b.className = "pop-row model-child";
+            if (current === c.key) b.setAttribute("aria-current", "true");
+            b.innerHTML = `<span>${esc(c.label)}${check(current === c.key)}</span><span class="sel" title="${esc(c.sel)}">${esc(c.sel)}</span>`;
+            b.addEventListener("click", () => pickModel(c, n));
+            group.appendChild(b);
+          });
+          if (n.footnote) {
+            const f = document.createElement("div");
+            f.className = "model-state";
+            f.textContent = n.footnote;
+            group.appendChild(f);
+          }
+        }
+        box.appendChild(group);
+      });
+      if (focusKey) box.querySelector(`[data-provider="${focusKey}"]`)?.focus();
+    }
+    renderModelTree();
+
+    // Cache Popover TTL simulation
+    let cacheCold = false;
+    document.getElementById("btn-sim-cold").addEventListener("click", (e) => {
+      cacheCold = !cacheCold;
+      if (cacheCold) {
+        document.getElementById("pop-cache-state").textContent = "Cold → Epoch #3";
+        document.getElementById("pop-cache-state").style.color = "var(--status-blocked-ink)";
+        document.getElementById("pop-cache-ttl").textContent = "0m00s · 3 masks flushed";
+        document.getElementById("pop-ttl-bar").style.width = "0%";
+        document.getElementById("pop-cr").textContent = "48.2K → 26.1K tok after flush";
+        document.getElementById("pop-epoch").textContent = "#3 committed on cold cache";
+        e.currentTarget.textContent = "Restore warm cache";
+      } else {
+        document.getElementById("pop-cache-state").textContent = "Warm";
+        document.getElementById("pop-cache-state").style.color = "var(--status-done-ink)";
+        document.getElementById("pop-cache-ttl").textContent = "4m12s / 5m00s";
+        document.getElementById("pop-ttl-bar").style.width = "84%";
+        document.getElementById("pop-cr").textContent = "41.8K tok (88.1%)";
+        document.getElementById("pop-epoch").textContent = "#2 frozen (3 masks queued)";
+        e.currentTarget.textContent = "Expire TTL → PruneEpoch #3";
+      }
+    });
+
+    // /btw interaction
+    document.querySelectorAll(".btw-q").forEach(b => b.addEventListener("click", () => {
+      document.getElementById("btw-out").textContent = b.dataset.a;
+    }));
+    document.getElementById("btw-input").addEventListener("keydown", e => {
+      if (e.key === "Enter" && e.target.value.trim()) {
+        document.getElementById("btw-out").textContent = `↳ [${currentSession().model} · sample] Answer to "${e.target.value.trim()}" would appear here. Nothing is written to session_message.`;
+        e.target.value = "";
+      }
+    });
+
+    // /tree DAG modal
+    const TREE = [
+      { id: "msg_001", pre: "", label: "Fix SQLITE_BUSY under 32 writers" },
+      { id: "msg_006", pre: "├─ ", label: "TransactionBehavior::Immediate" },
+      { id: "msg_014", pre: "│  └─ ", label: "32-writer test passes ✓" },
+      { id: "msg_007", pre: "└─ ", label: "Try r2d2 pool (forked · abandoned)" }
+    ];
+    let treeHead = "msg_014", treeSeq = 15, treeReturnFocus = null;
+    const treeModal = document.getElementById("tree-modal");
+    function openTreeModal() {
+      if (!treeModal.classList.contains("open")) treeReturnFocus = document.activeElement;
+      const box = document.getElementById("tree-nodes");
+      box.innerHTML = "";
+      TREE.forEach(n => {
+        const b = document.createElement("button");
+        b.className = "pop-row" + (n.id === treeHead ? " active" : "");
+        if (n.id === treeHead) b.setAttribute("aria-current", "true");
+        b.innerHTML = `<span><span style="color:var(--ink-tertiary)" aria-hidden="true">${n.pre}</span><b>${n.id}</b> ${esc(n.label)}</span><span class="tag">${n.id === treeHead ? "HEAD" : ""}</span>`;
+        b.addEventListener("click", () => { treeHead = n.id; openTreeModal(); });
+        box.appendChild(b);
+      });
+      treeModal.classList.add("open");
+      box.querySelector(".pop-row.active")?.focus();
+    }
+    function closeTreeModal() {
+      if (!treeModal.classList.contains("open")) return;
+      treeModal.classList.remove("open");
+      if (treeReturnFocus && document.contains(treeReturnFocus)) treeReturnFocus.focus();
+    }
+    // Keep Tab inside the dialog while it is open; click on the backdrop closes it.
+    treeModal.addEventListener("keydown", e => {
+      if (e.key !== "Tab") return;
+      const f = [...treeModal.querySelectorAll("button")];
+      if (!f.length) return;
+      if (e.shiftKey && document.activeElement === f[0]) { e.preventDefault(); f[f.length - 1].focus(); }
+      else if (!e.shiftKey && document.activeElement === f[f.length - 1]) { e.preventDefault(); f[0].focus(); }
+    });
+    treeModal.addEventListener("click", e => { if (e.target === treeModal) closeTreeModal(); });
+    document.getElementById("btn-close-tree").addEventListener("click", closeTreeModal);
+    document.getElementById("btn-fork-node").addEventListener("click", () => {
+      const id = "msg_0" + (treeSeq++);
+      TREE.push({ id, pre: "   └─ ", label: `Fork from ${treeHead}` });
+      treeHead = id;
+      openTreeModal();
+    });
+
+    // =========================================================================
+    // RIGHT DIFF DRAWER CONTENT
+    // =========================================================================
+    const DIFFS = {
+      writer: [
+        ["35#PT│","35"," ","fn apply_batch(&mut self, cmd: WriteCmd) -> Result<Receipt> {"],
+        ["36#BX│","36"," ","    self.conn.busy_timeout(Duration::from_millis(5_000))?;"],
+        ["37#VR│","37","-","    let tx = self.conn.transaction()?;"],
+        ["37#KB│","37","+","    let tx = self.conn"],
+        ["38#JN│","38","+","        .transaction_with_behavior(TransactionBehavior::Immediate)?;"],
+        ["39#SW│","39"," ","    let seq = bump_sequence(&tx, &cmd.aggregate_id)?;"],
+        ["40#ZP│","40"," ","    insert_event(&tx, seq, &cmd.event)?;"],
+        ["41#MK│","41","+","    projector::apply(&tx, &cmd.event)?;"],
+        ["42#YH│","42"," ","    tx.commit()?; // broadcast SSE strictly AFTER commit"]
+      ],
+      projector: [
+        ["82#ZT│","82"," ","SessionEvent::FileReadRecorded { path, blake3, epoch } => {"],
+        ["83#NP│","83","-","    // TODO: persist delta read state"],
+        ["83#JB│","83","+","    tx.execute(\"INSERT OR REPLACE INTO session_file_read_state ...\", ...)?;"],
+        ["84#VW│","84"," ","}"]
+      ],
+      test: [
+        ["01#ZP│","01","+","#[tokio::test]"],
+        ["02#MQ│","02","+","async fn thirty_two_writers_contiguous_seq_zero_busy() {"],
+        ["03#VR│","03","+","    assert_eq!(store.list_sequences(sid), (1..=1000).collect::<Vec<_>>());"],
+        ["04#TX│","04","+","}"]
+      ]
+    };
+    let activeDf = "writer", showHash = true;
+    function renderDiff() {
+      const box = document.getElementById("diff-scroll");
+      const tabs = document.getElementById("diff-file-tabs");
+      const sess = currentSession();
+      if (!sess || !sess.diff) {
+        tabs.style.display = "none";
+        box.innerHTML = `<div class="diff-empty"><strong>No changes in this session yet</strong>Edits show up here after the agent's first <code>edit</code> call.</div>`;
+        return;
+      }
+      tabs.style.display = "";
+      box.innerHTML = DIFFS[activeDf].map(([h, n, s, c]) => {
+        const cls = s === "+" ? "add" : s === "-" ? "del" : "";
+        const safe = c.replace(/&/g,"&amp;").replace(/</g,"&lt;");
+        return `<div class="diff-row ${cls}${showHash ? "" : " plain"}"><span class="ln">${showHash ? h : n}</span><span class="sg">${s}</span><span>${safe}</span></div>`;
+      }).join("");
+    }
+    document.querySelectorAll("#diff-file-tabs .file-tab").forEach(t => t.addEventListener("click", () => {
+      document.querySelectorAll("#diff-file-tabs .file-tab").forEach(x => { x.classList.remove("active"); x.setAttribute("aria-pressed", "false"); });
+      t.classList.add("active");
+      t.setAttribute("aria-pressed", "true");
+      activeDf = t.dataset.df;
+      renderDiff();
+    }));
+    document.getElementById("btn-hashline").addEventListener("click", (e) => {
+      showHash = !showHash;
+      e.currentTarget.classList.toggle("active", showHash);
+      e.currentTarget.setAttribute("aria-pressed", String(showHash));
+      renderDiff();
+    });
+
+    // =========================================================================
+    // BOTTOM CLI DRAWER CONTENT
+    // =========================================================================
+    const CLI_SNIPS = {
+      status: {
+        text: `$ saint-harness server status\nSaintHarness server: ready\nURL: http://127.0.0.1:3774 (UDS: /run/user/1000/saint-harness.sock)\nProjection: healthy (SQLite WAL · high_water_seq=1482 · writer_queue=0)\nActive sessions: 4 (2 blocked · 1 working · 1 done)`,
+        json: `$ saint-harness server status --json\n{"reachable":true,"ready":true,"coldStartMs":11,"projection":{"state":"healthy","highWaterSequence":1482},"sessions":{"blocked":2,"working":1,"done":1}}`
+      },
+      eval: {
+        text: `$ saint-harness eval benchmarks/core.yaml --repeat 3\n# sample values to show the layout; no eval has been run yet\nProfile           Edit         Pass@1   Cache Hit   1st-Try   Cost/Task\n─────────────────────────────────────────────────────────────────────────\nqwen-3.8-27b      hashline     83.3%    89.2%       91.4%     $0.000*\nclaude-flagship   str_replace  94.4%    91.8%       95.0%     $0.142\ngemini-flagship   hashline     88.9%    84.6%       89.7%     $0.048`,
+        json: `$ saint-harness eval benchmarks/core.yaml --repeat 3 --json\n{"repeat":3,"bestValue":{"profile":"qwen-3.8-27b","edit":"hashline","passAt1":0.833,"editFirstTry":0.914}}`
+      },
+      models: {
+        text: `$ saint-harness models\nqwen-3.8-27b     exact:qwen3.8-27b    110K / 262K  hashline\nclaude-flagship  latest_flagship      auto (ETag)  str_replace\ngemini-flagship  latest_flagship      auto (ETag)  hashline`,
+        json: `$ saint-harness models --json\n{"hardcodedProviderVersions":0,"selectors":["exact:qwen3.8-27b","latest_family:qwen4","latest_flagship"]}`
+      }
+    };
+    let cliKey = "status", cliJson = false;
+    const CLI_OFFLINE = {
+      text: `$ saint-harness server status\nerror: SaintHarness server is not reachable at http://127.0.0.1:3774\nhint: start it with \`saint-harness server\`, or check $XDG_RUNTIME_DIR/saint-harness.sock`,
+      json: `$ saint-harness server status --json\n{"reachable":false,"ready":false,"error":"connection refused","url":"http://127.0.0.1:3774"}`
+    };
+    function renderCli() {
+      const snip = (cliKey === "status" && daemonState === "error") ? CLI_OFFLINE : CLI_SNIPS[cliKey];
+      document.getElementById("cli-drawer-body").textContent = snip[cliJson ? "json" : "text"];
+    }
+    renderCli();
+    document.querySelectorAll("[data-cli]").forEach(b => b.addEventListener("click", () => {
+      document.querySelectorAll("[data-cli]").forEach(x => { x.classList.remove("active"); x.setAttribute("aria-pressed", "false"); });
+      b.classList.add("active");
+      b.setAttribute("aria-pressed", "true");
+      cliKey = b.dataset.cli;
+      renderCli();
+    }));
+    document.getElementById("btn-cli-json").addEventListener("click", (e) => {
+      cliJson = !cliJson;
+      e.currentTarget.classList.toggle("active", cliJson);
+      e.currentTarget.setAttribute("aria-pressed", String(cliJson));
+      renderCli();
+    });
+
+    // Global developer hotkeys (matching SHA KEYBINDINGS.md)
+    // (Browsers reserve Ctrl+N / Ctrl+T in a normal tab; they work in the SHA desktop shell and the TUI.)
+    window.addEventListener("keydown", e => {
+      const mod = e.metaKey || e.ctrlKey, k = e.key.toLowerCase();
+      if (mod && e.altKey && k === "s") { e.preventDefault(); toggleBtw(); return; }
+      if (mod && k === "b") { e.preventDefault(); document.getElementById("btn-sidebar").click(); }
+      if (mod && k === "d") { e.preventDefault(); toggleDiff(); }
+      if (mod && k === "j") { e.preventDefault(); toggleCli(); }
+      if (mod && k === "g") { e.preventDefault(); boardOpen = !boardOpen; renderAll(); }
+      if (mod && k === "t") { e.preventDefault(); openTreeModal(); }
+      if (mod && k === "n") { e.preventDefault(); newSession(); }
+      if (e.altKey && !mod && e.code === "BracketRight") { e.preventDefault(); togglePopover("model-popover"); }
+      if (e.key === "Escape") {
+        // Close the top-most layer only, and hand focus back to whatever opened it.
+        if (treeModal.classList.contains("open")) { closeTreeModal(); return; }
+        if (popoverEl.classList.contains("open")) { closeInlinePopover(); return; }
+        if (accessPop.classList.contains("open")) { setAccessPop(false); accessPill.focus(); return; }
+        const openPop = Object.keys(POPOVER_TRIGGERS).find(id => document.getElementById(id).classList.contains("open"));
+        if (openPop) { togglePopover(""); document.getElementById(POPOVER_TRIGGERS[openPop]).focus(); return; }
+        if (document.getElementById("btw-sheet").classList.contains("open")) { toggleBtw(false); inputEl.focus(); return; }
+        if (narrow.matches && document.getElementById("diff-drawer").classList.contains("open")) { toggleDiff(false); document.getElementById("btn-diff").focus(); return; }
+        if (narrow.matches && !document.getElementById("sidebar").classList.contains("collapsed")) { setSidebar(false); document.getElementById("btn-sidebar").focus(); return; }
+        if (boardOpen) { boardOpen = false; renderAll(); }
+      }
+    });
+
+    // =========================================================================
+    // ASCII WAVE FOR IDLE LANDING (mirrors SHA AsciiWaveBackground)
+    // Purpose: marks the empty session as a fresh start. It moves for 5s when
+    // the landing appears, then settles; a click sends one ripple. Under
+    // prefers-reduced-motion it draws a single still frame.
+    // =========================================================================
+    const canvas = document.getElementById("ascii-wave");
+    const ctx = canvas.getContext("2d");
+    const GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let cols = 0, rows = 0, glyphs = [];
+    const CELL_W = 10, CELL_H = 14, ripples = [];
+    let waveUntil = 0, wasLanding = false, waveFrames = 0;
+    function wakeWave(ms) {
+      waveFrames = 1; // always paint at least one frame
+      waveUntil = reduceMotion.matches ? 0 : Math.max(waveUntil, performance.now() + ms);
+    }
+
+    function resizeWave() {
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(rect.width * dpr);
+      canvas.height = Math.floor(rect.height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cols = Math.ceil(rect.width / CELL_W);
+      rows = Math.ceil(rect.height / CELL_H);
+      glyphs = Array.from({ length: cols * rows }, () => GLYPHS[Math.floor(Math.random() * GLYPHS.length)]);
+    }
+    canvas.addEventListener("click", e => {
+      if (reduceMotion.matches) return;
+      const rect = canvas.getBoundingClientRect();
+      ripples.push({ x: e.clientX - rect.left, y: e.clientY - rect.top, t: performance.now() });
+      if (ripples.length > 5) ripples.shift();
+      wakeWave(2400);
+    });
+    function drawWave(now) {
+      const active = now < waveUntil || waveFrames > 0;
+      if (active && document.getElementById("landing-pane").style.display === "flex" && cols > 0) {
+        waveFrames = 0;
+        const rect = canvas.getBoundingClientRect();
+        ctx.clearRect(0, 0, rect.width, rect.height);
+        ctx.font = '10px "SF Mono", ui-monospace, "Geist Mono", "JetBrains Mono", Menlo, monospace';
+        ctx.textBaseline = "top";
+        const isDark = document.documentElement.classList.contains("dark");
+        const inkRgb = isDark ? "252,252,252" : "13,13,13";
+        const accRgb = isDark ? "242,97,45" : "199,70,20";
+        const t = now * 0.00042;
+        while (ripples.length && now - ripples[0].t > 2400) ripples.shift();
+        for (let r = 0; r < rows; r++) {
+          const y = r * CELL_H;
+          for (let c = 0; c < cols; c++) {
+            const x = c * CELL_W, idx = r * cols + c;
+            const n = Math.sin(c * 0.11 + t) * Math.cos(r * 0.14 - t * 0.8) + Math.sin((c + r) * 0.07 + t * 1.4) * 0.5;
+            let inkAlpha = n > 0.38 ? Math.min(0.12, (n - 0.38) * 0.14) : 0;
+            let accAlpha = 0;
+            for (const rip of ripples) {
+              const age = now - rip.t, band = Math.abs(Math.hypot(x - rip.x, y - rip.y) - age * 0.32);
+              if (band < 28) { accAlpha = Math.max(accAlpha, (1 - band / 28) * (1 - age / 2400) * 0.7); if (Math.random() < 0.15) glyphs[idx] = GLYPHS[Math.floor(Math.random() * GLYPHS.length)]; }
+            }
+            if (inkAlpha > 0.01 && Math.random() < 0.01) glyphs[idx] = GLYPHS[Math.floor(Math.random() * GLYPHS.length)];
+            if (accAlpha > 0.02) { ctx.fillStyle = `rgba(${accRgb},${accAlpha.toFixed(3)})`; ctx.fillText(glyphs[idx], x, y); }
+            else if (inkAlpha > 0.01) { ctx.fillStyle = `rgba(${inkRgb},${inkAlpha.toFixed(3)})`; ctx.fillText(glyphs[idx], x, y); }
+          }
+        }
+      }
+      requestAnimationFrame(drawWave);
+    }
+    window.addEventListener("resize", () => { resizeWave(); wakeWave(0); });
+    document.getElementById("btn-theme").addEventListener("click", () => wakeWave(0));
+
+    // Boot straight into the workspace
+    renderAll();
+    requestAnimationFrame(drawWave);
+  </script>
+</body>
+</html>

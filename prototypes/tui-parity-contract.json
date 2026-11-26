@@ -1,0 +1,300 @@
+{
+  "schemaVersion": "1.1.0",
+  "sourceOfTruth": "prototype",
+  "syncedWithPrototypeOn": "2026-11-26",
+  "product": "SaintHarness",
+  "prototypePath": "prototypes/saint-harness-cli-prototype.html",
+  "specPath": "prototypes/CLI_PROTOTYPE_SPEC.md",
+  "designSystemSource": "Saint Hyper Agent (preset: saint)",
+  "theme": {
+    "notes": "Alpha tokens from the prototype CSS are flattened onto `surface`. Status hues are fills only; any text in a status color must use the *Ink variant. Deliberate deviations from SHA for WCAG AA: inkTertiary, light textAccent, *Ink.",
+    "dark": {
+      "surface": [17, 17, 17],
+      "surfaceUnder": [12, 12, 12],
+      "sidebarBg": [20, 20, 20],
+      "panel": [23, 23, 23],
+      "controlBg": [28, 28, 28],
+      "elevatedBg": [32, 32, 32],
+      "userBubble": [28, 28, 28],
+      "inkPrimary": [252, 252, 252],
+      "inkSecondary": [163, 163, 163],
+      "inkTertiary": [154, 154, 154],
+      "border": [38, 38, 38],
+      "borderHeavy": [52, 52, 52],
+      "dividerHairline": [30, 30, 30],
+      "accent": [242, 97, 45],
+      "textAccent": [246, 144, 108],
+      "accentBg": [44, 27, 20],
+      "fullAccess": [254, 133, 73],
+      "fullAccessInk": [254, 133, 73],
+      "statusDone": [0, 162, 64],
+      "statusDoneInk": [34, 180, 95],
+      "statusBlocked": [245, 180, 74],
+      "statusBlockedInk": [245, 180, 74],
+      "statusWorking": [176, 109, 255],
+      "statusWorkingInk": [192, 140, 255],
+      "statusError": [224, 46, 42],
+      "statusErrorInk": [239, 99, 96],
+      "diffAddedBg": [14, 46, 26],
+      "diffRemovedBg": [58, 23, 22]
+    },
+    "light": {
+      "surface": [255, 255, 255],
+      "surfaceUnder": [246, 246, 246],
+      "sidebarBg": [250, 250, 250],
+      "panel": [248, 248, 248],
+      "controlBg": [243, 243, 243],
+      "elevatedBg": [255, 255, 255],
+      "userBubble": [245, 245, 245],
+      "inkPrimary": [13, 13, 13],
+      "inkSecondary": [105, 105, 105],
+      "inkTertiary": [104, 104, 104],
+      "border": [234, 234, 234],
+      "borderHeavy": [221, 221, 221],
+      "dividerHairline": [239, 239, 239],
+      "accent": [199, 70, 20],
+      "textAccent": [184, 63, 16],
+      "accentBg": [250, 238, 234],
+      "fullAccess": [226, 85, 5],
+      "fullAccessInk": [163, 58, 3],
+      "statusDone": [0, 162, 64],
+      "statusDoneInk": [4, 108, 78],
+      "statusBlocked": [217, 119, 6],
+      "statusBlockedInk": [180, 83, 9],
+      "statusWorking": [117, 30, 217],
+      "statusWorkingInk": [117, 30, 217],
+      "statusError": [224, 46, 42],
+      "statusErrorInk": [198, 37, 33],
+      "diffAddedBg": [224, 244, 232],
+      "diffRemovedBg": [252, 232, 232]
+    },
+    "minTextContrastRatio": 4.5,
+    "contrastCheckedOn": ["surface", "panel", "controlBg", "elevatedBg", "userBubble", "hoverRow", "statusTintBg", "diffAddedBg", "diffRemovedBg"]
+  },
+  "typography": {
+    "shaAlignedDefault": {
+      "uiFontFamily": "-apple-system, BlinkMacSystemFont, \"SF Pro Text\", \"Segoe UI\", system-ui, sans-serif",
+      "displayFontFamily": "\"Cal Sans\", var(--font-ui-family)",
+      "monoFontFamily": "\"JetBrains Mono Variable\", \"JetBrains Mono\", \"SF Mono\", \"SFMono-Regular\", Consolas, \"Liberation Mono\", Menlo, monospace",
+      "terminalFontFamily": "\"JetBrainsMono NFM\", \"JetBrainsMono NF\", \"JetBrains Mono\", \"SF Mono\", monospace",
+      "chatFontSizePx": 13,
+      "terminalFontSizePx": 12,
+      "chatLineHeight": 1.625,
+      "letterSpacing": "normal",
+      "neverBundleAppleFonts": true
+    },
+    "ratatuiTerminal": {
+      "inheritsHostTerminalFont": true,
+      "supportsNoColor": true,
+      "lightMinContrastRatio": 4.5
+    }
+  },
+  "brandMarks": {
+    "brailleStandard": {
+      "cols": 16,
+      "rows": 13,
+      "minTerminalRows": 28,
+      "crownRows": [0, 1, 2],
+      "lines": [
+        "     ⡀ ⣰⣆ ⢀",
+        "  ⠈⢷⣤⣿⠶⠿⠿⠶⣿⣤⡾⠁",
+        "   ⠈⠳⢂⣠⣤⣤⣄⡐⠞⠁",
+        "⢀⣠⣴⣶⣿⣿⣿⡿⢿⣿⣿⣿⣶⣦⣄⡀",
+        "⣿⡟⠉⣱⣿⢋⣴⡶⢶⣦⡝⢿⣎⠉⢻⣿",
+        "⣿⡇ ⣿⡇⣿⣏  ⢹⣿⣼⣿ ⢸⣿",
+        "⣿⡇ ⠹⣿⣌⠻⢷⢆⣄⡈⠙⠿ ⢸⣿",
+        "⣿⡇ ⡀⠈⠛⠿⢂⣬⡛⢿⣦⡀ ⢸⣿",
+        "⣿⣇ ⣿⣷⣦⡀⠈⠙⢿⣧⢹⣷ ⣸⣿",
+        "⠹⣿⡄⢻⣧⠻⣷⣤⣤⣾⠏⣼⡟⢠⣿⠏",
+        " ⠹⣿⣆⠻⢷⣦⡍⢩⣴⡾⠟⣰⣿⠏",
+        "  ⠈⠻⣿⣦⣈⠁⠈⣁⣴⣿⠟⠁",
+        "    ⠈⠙⠻⢿⡿⠟⠋⠁"
+      ]
+    },
+    "brailleCompact": {
+      "cols": 10,
+      "rows": 8,
+      "minTerminalRows": 20,
+      "crownRows": [0, 1],
+      "lines": [
+        "  ⣀⣄⣰⣆⣠⣀",
+        "  ⠛⣉⣥⣬⣩⠛",
+        "⣴⠞⣻⢟⣿⣿⡻⣟⠳⣦",
+        "⣿ ⣿⢿⣅⠈⠿⣿ ⣿",
+        "⣿ ⡘⠳⢏⣝⢶⣌ ⣿",
+        "⢿⡀⣿⢷⣀⣉⡷⣿⢀⡿",
+        "⠈⢷⣜⠷⡭⢭⠾⣣⡾⠁",
+        "  ⠙⠻⢦⡴⠞⠋"
+      ]
+    }
+  },
+  "responsiveBreakpoints": [
+    {
+      "name": "ultra_compact",
+      "cols": 80,
+      "rows": 24,
+      "sidebarDefaultOpen": false,
+      "diffDrawerMode": "overlay",
+      "boardColumns": 1,
+      "logoVariant": "brailleCompact",
+      "maxHeaderGlanceItems": 2
+    },
+    {
+      "name": "narrow",
+      "cols": 100,
+      "rows": 30,
+      "sidebarDefaultOpen": false,
+      "diffDrawerMode": "overlay",
+      "boardColumns": 2,
+      "logoVariant": "brailleStandard",
+      "maxHeaderGlanceItems": 3
+    },
+    {
+      "name": "standard",
+      "cols": 120,
+      "rows": 38,
+      "sidebarDefaultOpen": true,
+      "sidebarCols": 28,
+      "diffDrawerMode": "split",
+      "boardColumns": 3,
+      "logoVariant": "brailleStandard",
+      "maxHeaderGlanceItems": 3
+    },
+    {
+      "name": "split_review",
+      "cols": 140,
+      "rows": 42,
+      "sidebarDefaultOpen": true,
+      "sidebarCols": 28,
+      "diffDrawerCols": 54,
+      "diffDrawerMode": "split",
+      "boardColumns": 3,
+      "logoVariant": "brailleStandard",
+      "maxHeaderGlanceItems": 3
+    },
+    {
+      "name": "wide",
+      "cols": 180,
+      "rows": 50,
+      "sidebarDefaultOpen": true,
+      "sidebarCols": 30,
+      "diffDrawerCols": 68,
+      "diffDrawerMode": "split",
+      "boardColumns": 3,
+      "logoVariant": "brailleStandard",
+      "maxHeaderGlanceItems": 3
+    }
+  ],
+  "webBreakpointsPx": {
+    "diffDrawerNarrow": { "maxWidth": 1100, "diffDrawerWidth": 380 },
+    "overlayRails": { "maxWidth": 820, "sidebarDefaultOpen": false, "sidebarMode": "overlay-with-scrim", "diffDrawerMode": "fullscreen-overlay", "boardColumns": 1 },
+    "compactChrome": { "maxWidth": 640, "hideFontCompareToggles": true, "hideCrumbRoot": true },
+    "phone": { "maxWidth": 480, "cacheTriggerShowsDotOnly": true },
+    "minSupportedWidth": 320,
+    "minTouchTargetPx": 44
+  },
+  "invariants": {
+    "sidebarGroupOrder": ["blocked", "working", "done", "idle"],
+    "runtimeModes": ["approval-required", "auto", "full-access"],
+    "runtimeModeAliases": {
+      "approval-required": "Ask for approval",
+      "auto": "Auto mode (--auto, sandboxed)",
+      "full-access": "Bypass permissions (--bypass-permissions, no sandbox)"
+    },
+    "workedForCollapsedByDefault": true,
+    "diffDrawerClosedByDefault": true,
+    "cliDrawerClosedByDefault": true,
+    "cachePopoverClosedByDefault": true,
+    "sandboxDetailsCollapsedByDefault": true,
+    "approvalShortcuts": [1, 2, 3, 4],
+    "cancelTurnEmitsUserDeclined": true,
+    "inlinePaletteTriggers": ["/", "@", "$"],
+    "inlinePaletteKeyboard": ["ArrowUp", "ArrowDown", "Enter", "Escape"],
+    "slashCommands": ["/plan", "/auto", "/bypass", "/supervised", "/diff", "/btw", "/tree", "/board", "/model", "/compact", "/cli"],
+    "composerFooterItems": ["buildPlanMode", "runtimeAccess", "contextUsage", "send"],
+    "paletteOnlyCommands": {
+      "/btw": { "shortcut": "Ctrl+Alt+S", "footerButton": false },
+      "/tree": { "shortcut": "Ctrl+T", "footerButton": false }
+    },
+    "escapeClosesTopLayerOnlyAndRestoresFocus": true,
+    "spinnerFrames": ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+    "spinnerIntervalMs": 65,
+    "landingWaveSettlesAfterMs": 5000,
+    "reducedMotionStopsAllAnimation": true,
+    "cleanRoomForbiddenTokensInUi": true,
+    "antiSlop": {
+      "selectionMarker": "solid-fill-plus-check",
+      "noColoredLeftStripe": true,
+      "noColoredLeadingTextInMenus": true,
+      "colorOnlyForRealRiskOrStatus": ["statusDots", "diffSigns", "fullAccessFlag"],
+      "approvalChoiceNumbersNeutral": true,
+      "noGlowNoInfinitePulse": true,
+      "menuRowsSingleLine": true,
+      "noFakeWindowTrafficLights": true,
+      "noEmDashInUiText": true,
+      "noDecorativeEmoji": true,
+      "sampleDataLabelled": true
+    },
+    "requiredStates": {
+      "sessionList": ["loading", "error", "empty"],
+      "boardColumn": ["empty"],
+      "diffDrawer": ["empty"],
+      "inlinePalette": ["noMatch"],
+      "modelCatalog": ["loading", "error"],
+      "serverStatus": ["unreachable"]
+    }
+  },
+  "modelPicker": {
+    "layout": "tree",
+    "leaves": [
+      { "label": "Qwen 3.8 27B", "selector": "exact:qwen3.8-27b" },
+      { "label": "Qwen 4", "selector": "latest_family:qwen4" }
+    ],
+    "providers": [
+      {
+        "key": "claude",
+        "catalog": "Anthropic",
+        "loadOnExpand": true,
+        "children": [
+          { "label": "Auto", "selector": "latest_flagship" },
+          { "label": "Fable 5.2", "selector": "claude-fable-5-2" },
+          { "label": "Opus 5.5", "selector": "claude-opus-5-5" },
+          { "label": "Sonnet 5.5", "selector": "claude-sonnet-5-5" },
+          { "label": "Haiku 5.5", "selector": "claude-haiku-5-5" }
+        ]
+      },
+      {
+        "key": "gemini",
+        "catalog": "Google",
+        "loadOnExpand": true,
+        "concreteIdsFromLiveCatalogOnly": true,
+        "children": [
+          { "label": "Auto", "selector": "latest_flagship" },
+          { "label": "Pro", "selector": "latest_family:gemini-pro" },
+          { "label": "Flash", "selector": "latest_family:gemini-flash" }
+        ]
+      }
+    ],
+    "nameFont": "ui",
+    "idFont": "mono",
+    "currentMarker": "check",
+    "handoffWritesTranscriptDivider": true
+  },
+  "saintHyperAgentIntegration": {
+    "providerKind": "saintHarness",
+    "requiredAdapterCapabilities": [
+      "supportsTurnSteering",
+      "supportsForkThroughTurn",
+      "supportsRuntimeModelList",
+      "supportsSkillDiscovery",
+      "supportsPluginDiscovery",
+      "supportsLiveTurnDiffPatch"
+    ],
+    "sessionModelSwitch": "in-session",
+    "conversationRollback": "native",
+    "supportsAutoRuntimeMode": true,
+    "managedModeDisablesInternalGitSnapshot": true,
+    "saintMcpDefaultExposure": "direct",
+    "bearerTokenRamOnlyAndEnvScrubbed": true
+  }
+}

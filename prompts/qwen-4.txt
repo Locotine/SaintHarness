@@ -1,0 +1,4 @@
+Tool call discipline:
+- Prefer `repo_map` and `read` outlines to locate exact symbol ranges before editing.
+- Batch independent read-only tool calls in parallel and apply multi-hunk file updates atomically.
+- Check fast-lint and test feedback immediately after edits before moving to the next file.

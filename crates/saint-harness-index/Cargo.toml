@@ -1,0 +1,23 @@
+[package]
+name = "saint-harness-index"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+monorepo-index = ["dep:tantivy"]
+
+[dependencies]
+async-trait.workspace = true
+ignore.workspace = true
+saint-harness-schema.workspace = true
+tantivy = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio.workspace = true

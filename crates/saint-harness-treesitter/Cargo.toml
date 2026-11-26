@@ -1,0 +1,37 @@
+[package]
+name = "saint-harness-treesitter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["lang-core"]
+lang-core = [
+  "dep:tree-sitter-rust",
+  "dep:tree-sitter-typescript",
+  "dep:tree-sitter-javascript",
+  "dep:tree-sitter-python",
+  "dep:tree-sitter-go",
+  "dep:tree-sitter-json",
+  "dep:tree-sitter-toml-ng",
+]
+lang-all = ["lang-core"]
+
+[dependencies]
+ignore.workspace = true
+saint-harness-schema.workspace = true
+tree-sitter.workspace = true
+tree-sitter-go = { workspace = true, optional = true }
+tree-sitter-javascript = { workspace = true, optional = true }
+tree-sitter-json = { workspace = true, optional = true }
+tree-sitter-python = { workspace = true, optional = true }
+tree-sitter-rust = { workspace = true, optional = true }
+tree-sitter-toml-ng = { workspace = true, optional = true }
+tree-sitter-typescript = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true

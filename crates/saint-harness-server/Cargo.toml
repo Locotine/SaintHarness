@@ -1,0 +1,43 @@
+[package]
+name = "saint-harness-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["lang-core"]
+lang-core = ["saint-harness-treesitter/lang-core"]
+lang-all = ["saint-harness-treesitter/lang-all"]
+fast-lint = ["saint-harness-lsp/fast-lint"]
+ts-plugins = ["saint-harness-codemode/ts-plugins"]
+monorepo-index = ["dep:saint-harness-index", "saint-harness-index/monorepo-index"]
+snapcompact = ["saint-harness-token/snapcompact"]
+
+[dependencies]
+axum.workspace = true
+dashmap.workspace = true
+futures.workspace = true
+saint-harness-ai.workspace = true
+saint-harness-codemode.workspace = true
+saint-harness-core.workspace = true
+saint-harness-edit.workspace = true
+saint-harness-index = { workspace = true, optional = true }
+saint-harness-lsp.workspace = true
+saint-harness-protocol.workspace = true
+saint-harness-schema.workspace = true
+saint-harness-shell.workspace = true
+saint-harness-token.workspace = true
+saint-harness-treesitter.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+tokio-util.workspace = true
+ulid.workspace = true
+
+[dev-dependencies]
+reqwest.workspace = true
+tempfile.workspace = true
