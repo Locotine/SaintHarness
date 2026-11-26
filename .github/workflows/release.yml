@@ -1,0 +1,351 @@
+# Cross-platform release pipeline for SaintHarness.
+# Modeled on saint-hyper-agent release engineering:
+#   1. Preflight validates semver, clean-room, firewall, 100% UI prototype parity, clippy, and tests.
+#   2. Build matrix produces verified binaries + packages for:
+#      - Linux x86_64 (.tar.gz + Debian/Ubuntu amd64.deb built on ubuntu-22.04 with GLIBC <= 2.35)
+#      - Linux aarch64 (.tar.gz + Debian/Ubuntu arm64.deb built on ubuntu-22.04-arm with GLIBC <= 2.35)
+#      - macOS Apple Silicon arm64 (.tar.gz + lipo check + optional codesign/notarization)
+#      - macOS Intel x86_64 (.tar.gz + lipo check + optional codesign/notarization)
+#      - Windows x64 MSVC (.zip + native Windows CLI smoke)
+#   3. Real container verification installs amd64.deb on Debian 12, Debian 13, Ubuntu 22.04, Ubuntu 24.04.
+#   4. Publish generates SHA256SUMS.txt, release-manifest.json, attaches install.sh/install.ps1,
+#      and idempotently creates or updates the GitHub Release.
+name: Release SaintHarness
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 0.1.0 or v0.1.0)"
+        required: true
+        type: string
+      publish_release:
+        description: "Publish archives, .deb packages, installers, and manifest to GitHub Releases"
+        required: true
+        default: false
+        type: boolean
+      platform:
+        description: "Target platform scope"
+        required: false
+        type: choice
+        default: all
+        options: [all, linux-x64, linux-arm64, mac-arm64, mac-x64, win-x64]
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+
+concurrency:
+  group: saint-harness-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Preflight & Quality Gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.release_meta.outputs.version }}
+      tag: ${{ steps.release_meta.outputs.tag }}
+      publish_release: ${{ steps.release_mode.outputs.publish_release }}
+      matrix: ${{ steps.build_matrix.outputs.include }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - id: release_mode
+        name: Resolve publication mode
+        shell: bash
+        env:
+          PUBLISH_RELEASE: ${{ github.event_name == 'push' || inputs.publish_release }}
+        run: |
+          echo "publish_release=$PUBLISH_RELEASE" >> "$GITHUB_OUTPUT"
+
+      - id: build_matrix
+        name: Resolve target build matrix
+        shell: bash
+        env:
+          PLATFORM: ${{ inputs.platform || 'all' }}
+        run: |
+          ALL='[
+            {"id":"linux-x64","label":"Linux x86_64 (Ubuntu/Debian)","runner":"ubuntu-22.04","platform":"linux","arch":"x86_64","deb_arch":"amd64","rust_target":"x86_64-unknown-linux-gnu"},
+            {"id":"linux-arm64","label":"Linux aarch64 (Ubuntu/Debian)","runner":"ubuntu-22.04-arm","platform":"linux","arch":"aarch64","deb_arch":"arm64","rust_target":"aarch64-unknown-linux-gnu"},
+            {"id":"mac-arm64","label":"macOS arm64","runner":"macos-15","platform":"mac","arch":"arm64","deb_arch":"","rust_target":"aarch64-apple-darwin"},
+            {"id":"mac-x64","label":"macOS x86_64","runner":"macos-15","platform":"mac","arch":"x86_64","deb_arch":"","rust_target":"x86_64-apple-darwin"},
+            {"id":"win-x64","label":"Windows x64","runner":"windows-2022","platform":"win","arch":"x86_64","deb_arch":"","rust_target":"x86_64-pc-windows-msvc"}
+          ]'
+          INCLUDE="$(jq -c --arg p "$PLATFORM" 'map(select($p == "all" or .id == $p))' <<<"$ALL")"
+          echo "include=$INCLUDE" >> "$GITHUB_OUTPUT"
+
+      - id: release_meta
+        name: Validate stable release version
+        shell: bash
+        env:
+          RAW_VERSION: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.version || github.ref_name }}
+        run: |
+          CLEAN_VERSION="$(python3 scripts/release/sync-version.py --normalize "$RAW_VERSION")"
+          echo "version=$CLEAN_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$CLEAN_VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-rust
+        with:
+          components: clippy, rustfmt
+          cache-key: release-preflight
+
+      - name: Run full preflight gates (contracts, cleanroom, firewall, UI parity, clippy, tests)
+        run: |
+          python3 .github/scripts/test_ci_contracts.py
+          bash scripts/check-cleanroom.sh
+          bash scripts/check-firewall.sh
+          bash scripts/check-prototype-parity.sh
+          cargo fmt --all -- --check
+          cargo clippy --workspace --all-targets -- -D warnings
+          cargo test --workspace --locked
+
+  build_release:
+    name: Build (${{ matrix.label }})
+    needs: [preflight]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.preflight.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-rust
+        with:
+          target: ${{ matrix.rust_target }}
+          cache-key: release-${{ matrix.id }}
+
+      - name: Synchronize workspace release version
+        shell: bash
+        run: |
+          PYTHON_BIN="python3"
+          command -v "$PYTHON_BIN" >/dev/null 2>&1 || PYTHON_BIN="python"
+          "$PYTHON_BIN" scripts/release/sync-version.py --sync "${{ needs.preflight.outputs.version }}"
+
+      - name: Build stripped release binary (with ACP bridge)
+        shell: bash
+        run: |
+          cargo build --release --target "${{ matrix.rust_target }}" -p saint-harness-cli --features acp
+
+      - name: Verify Mach-O architecture and optionally sign macOS binary
+        if: matrix.platform == 'mac'
+        shell: bash
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+        run: |
+          set -euo pipefail
+          BIN="target/${{ matrix.rust_target }}/release/saint-harness"
+          ARCHS="$(lipo -archs "$BIN")"
+          echo "Mach-O architectures: $ARCHS"
+          EXPECTED_MAC_ARCH="${{ matrix.arch }}"
+          if [[ "$ARCHS" != *"$EXPECTED_MAC_ARCH"* ]]; then
+            echo "Expected Mach-O arch $EXPECTED_MAC_ARCH, got $ARCHS" >&2
+            exit 1
+          fi
+          if [[ -n "${APPLE_SIGNING_IDENTITY:-}" ]]; then
+            codesign --force --options runtime --timestamp --sign "$APPLE_SIGNING_IDENTITY" "$BIN"
+            codesign --verify --strict --verbose=2 "$BIN"
+          else
+            codesign --force --sign - "$BIN"
+          fi
+
+      - name: Smoke-test native release binary (Unix)
+        if: matrix.platform == 'linux' || (matrix.platform == 'mac' && matrix.arch == 'arm64')
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN="target/${{ matrix.rust_target }}/release/saint-harness"
+          "$BIN" --version
+          "$BIN" models --json | grep -q '"hardcodedProviderVersions": 0'
+          set +e
+          "$BIN" server status --url http://127.0.0.1:1 --json
+          rc=$?
+          set -e
+          test "$rc" -eq 1
+
+      - name: Smoke-test native release binary (Windows)
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: |
+          $bin = "target/${{ matrix.rust_target }}/release/saint-harness.exe"
+          & $bin --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $models = & $bin models --json | Out-String
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($models -notmatch '"hardcodedProviderVersions": 0') {
+            throw "Unexpected models --json output: $models"
+          }
+          & $bin server status --url http://127.0.0.1:1 --json | Out-Null
+          if ($LASTEXITCODE -ne 1) {
+            throw "Expected exit code 1 for offline server status, got $LASTEXITCODE"
+          }
+
+      - name: Package Linux tarball and verified Debian/Ubuntu .deb
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER="${{ needs.preflight.outputs.version }}"
+          BIN="target/${{ matrix.rust_target }}/release/saint-harness"
+          mkdir -p release-assets
+          STAGE="$(mktemp -d)"
+          trap 'rm -rf "$STAGE"' EXIT
+          install -m 0755 "$BIN" "$STAGE/saint-harness"
+          tar -C "$STAGE" -czf "release-assets/saint-harness_${VER}_linux-${{ matrix.arch }}.tar.gz" saint-harness
+          bash scripts/release/build-deb.sh \
+            --binary "$BIN" \
+            --version "$VER" \
+            --arch "${{ matrix.deb_arch }}" \
+            --out-dir release-assets
+          ls -lh release-assets/
+
+      - name: Package macOS tarball
+        if: matrix.platform == 'mac'
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER="${{ needs.preflight.outputs.version }}"
+          BIN="target/${{ matrix.rust_target }}/release/saint-harness"
+          mkdir -p release-assets
+          STAGE="$(mktemp -d)"
+          trap 'rm -rf "$STAGE"' EXIT
+          install -m 0755 "$BIN" "$STAGE/saint-harness"
+          tar -C "$STAGE" -czf "release-assets/saint-harness_${VER}_darwin-${{ matrix.arch }}.tar.gz" saint-harness
+          ls -lh release-assets/
+
+      - name: Package Windows zip archive
+        if: matrix.platform == 'win'
+        shell: pwsh
+        run: |
+          $ver = "${{ needs.preflight.outputs.version }}"
+          $bin = "target/${{ matrix.rust_target }}/release/saint-harness.exe"
+          New-Item -ItemType Directory -Path release-assets -Force | Out-Null
+          Compress-Archive -Path $bin -DestinationPath "release-assets/saint-harness_${ver}_windows-${{ matrix.arch }}.zip" -Force
+          Get-ChildItem release-assets
+
+      - name: Upload platform release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: saint-harness-${{ matrix.id }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 14
+
+  # Real distro install verification: proves the amd64.deb installs cleanly and runs
+  # on Debian 12, Debian 13, Ubuntu 22.04, and Ubuntu 24.04 without missing deps or glibc errors.
+  verify_debian_ubuntu:
+    name: Verify .deb install (${{ matrix.distro }})
+    needs: [preflight, build_release]
+    if: inputs.platform == '' || inputs.platform == 'all' || inputs.platform == 'linux-x64'
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ matrix.distro }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        distro:
+          - debian:bookworm
+          - debian:trixie
+          - ubuntu:22.04
+          - ubuntu:24.04
+    steps:
+      - name: Download Linux x64 release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: saint-harness-linux-x64
+          path: dist
+
+      - name: Install .deb via apt-get and run CLI smoke
+        run: |
+          set -euo pipefail
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get -o Acquire::Retries=3 update
+          apt-get -o Acquire::Retries=3 install -y ./dist/saint-harness_*_amd64.deb
+          saint-harness --version
+          saint-harness models --json | grep -q '"hardcodedProviderVersions": 0'
+          set +e
+          saint-harness server status --url http://127.0.0.1:1 --json
+          rc=$?
+          set -e
+          test "$rc" -eq 1
+
+  publish_release:
+    name: Publish GitHub Release
+    needs: [preflight, build_release, verify_debian_ubuntu]
+    if: >-
+      needs.preflight.outputs.publish_release == 'true' &&
+      (inputs.platform == '' || inputs.platform == 'all')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all platform release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: saint-harness-*
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Stage cross-platform installer scripts
+        run: |
+          cp scripts/install.sh release-artifacts/install.sh
+          cp scripts/install.ps1 release-artifacts/install.ps1
+          chmod +x release-artifacts/install.sh
+
+      - name: Generate SHA256SUMS.txt, release-manifest.json, and package manager manifests
+        run: |
+          python3 scripts/release/generate-manifest.py \
+            --artifacts-dir release-artifacts \
+            --version "${{ needs.preflight.outputs.version }}" \
+            --tag "${{ needs.preflight.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --commit "${{ github.sha }}" \
+            --out-dir release-artifacts
+          python3 scripts/release/generate-package-manifests.py \
+            --manifest release-artifacts/release-manifest.json \
+            --repo "${{ github.repository }}" \
+            --out-dir release-artifacts
+          tar -C release-artifacts -czf release-artifacts/saint-harness_${{ needs.preflight.outputs.version }}_winget-manifests.tar.gz winget
+          rm -rf release-artifacts/winget
+          cat release-artifacts/SHA256SUMS.txt
+          cat release-artifacts/release-manifest.json
+          cat release-artifacts/saint-harness.rb
+          cat release-artifacts/saint-harness.scoop.json
+
+      - name: Publish or update GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.preflight.outputs.tag }}
+          VERSION: ${{ needs.preflight.outputs.version }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release-artifacts/* --clobber
+          else
+            gh release create "$TAG" release-artifacts/* \
+              --target "$GITHUB_SHA" \
+              --title "SaintHarness v$VERSION" \
+              --generate-notes \
+              --latest
+          fi

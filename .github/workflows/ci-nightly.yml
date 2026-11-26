@@ -1,0 +1,53 @@
+# Nightly verification for heavy optional accelerator features (oxc, tantivy, tiny-skia, acp)
+# across Linux, macOS, and Windows so PR CI stays fast while optional features never bit-rot.
+name: CI Nightly
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  optional-features:
+    name: Optional Accelerator Features (${{ matrix.label }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Ubuntu 24.04
+            os: ubuntu-24.04
+          - label: macOS 15
+            os: macos-15
+          - label: Windows 2022
+            os: windows-2022
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-rust
+        with:
+          cache-key: nightly-features-${{ matrix.os }}
+
+      - name: Check optional accelerator crates
+        shell: bash
+        run: |
+          cargo check -p saint-harness-lsp --features fast-lint
+          cargo check -p saint-harness-codemode --features ts-plugins
+          cargo check -p saint-harness-index --features monorepo-index
+          cargo check -p saint-harness-token --features snapcompact
+          cargo check -p saint-harness-cli --features full
+          cargo test -p saint-harness-token --features snapcompact
+          cargo test -p saint-harness-index --features monorepo-index

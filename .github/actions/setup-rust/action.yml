@@ -1,0 +1,31 @@
+name: Setup Rust Workspace
+description: Install pinned stable Rust toolchain and configure Swatinem/rust-cache per OS and target.
+
+inputs:
+  target:
+    description: Optional Rust target triple (for cross-compilation)
+    required: false
+    default: ""
+  components:
+    description: Optional comma-separated rustup components (e.g. clippy, rustfmt)
+    required: false
+    default: ""
+  cache-key:
+    description: Optional extra key suffix for Swatinem/rust-cache
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: ${{ inputs.target }}
+        components: ${{ inputs.components }}
+
+    - name: Cache Cargo registry and target
+      uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ inputs.cache-key }}
+        shared-key: ${{ runner.os }}-${{ runner.arch }}-${{ inputs.target || 'native' }}

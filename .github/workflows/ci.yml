@@ -1,0 +1,263 @@
+# Independent feedback lanes; the quality job aggregates results fail-closed.
+# Cross-platform coverage: Linux Ubuntu (24.04 + 22.04), Linux Debian (12 Bookworm),
+# macOS (Apple Silicon), and Windows (x64 MSVC).
+# Design rationale and contract guarantees: .github/CI.md.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+# Cancel stale PR runs on newer pushes; main never cancels.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+jobs:
+  # Docs-only filter: PRs touching only markdown/docs/CI images run static-fast + quality only.
+  # outputs.code is 'true' when any code, workflow, script, profile, prompt, or prototype changed.
+  changes:
+    name: Detect code changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Filter docs-only changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          predicate-quantifier: "every"
+          filters: |
+            code:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+              - '!**/*.mdx'
+              - '!.github/**/*.{png,jpg,jpeg,gif,svg,webp,ico}'
+
+  # Never wait for the changes job to report CI contract, cleanroom, firewall, parity, or lint failures.
+  static-fast:
+    name: Static Checks (fast)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify CI & release contracts
+        run: python3 .github/scripts/test_ci_contracts.py
+
+      - name: Verify clean-room & zero hardcoded provider versions
+        run: bash scripts/check-cleanroom.sh
+
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-rust
+        with:
+          components: clippy, rustfmt
+          cache-key: static-fast
+
+      - name: Check formatting (rustfmt)
+        run: cargo fmt --all -- --check
+
+      - name: Verify Law #1 dependency firewall & single tree-sitter ABI
+        run: bash scripts/check-firewall.sh
+
+      - name: Verify 100% UI prototype parity & WCAG AA contrast
+        run: bash scripts/check-prototype-parity.sh
+
+      - name: Clippy lint (-D warnings, zero unwrap/expect/panic)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Verify thin TUI client & ACP feature builds
+        run: |
+          cargo check -p saint-harness-cli --no-default-features --features tui --all-targets
+          cargo check -p saint-harness-cli --features acp --all-targets
+
+  test-ubuntu:
+    name: Linux Ubuntu (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-22.04]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-rust
+        with:
+          cache-key: test-${{ matrix.os }}
+
+      - name: Run full workspace test suite (includes Landlock & SQLite WAL)
+        run: cargo test --workspace --locked
+
+      # Validate .deb packaging and GLIBC <= 2.35 baseline on ubuntu-22.04 on every code PR.
+      - name: Smoke-test Debian/Ubuntu .deb package and GLIBC <= 2.35 gate
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          cargo build --release -p saint-harness-cli --locked
+          VER="$(python3 scripts/release/sync-version.py --normalize "$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')")"
+          bash scripts/release/build-deb.sh \
+            --binary target/release/saint-harness \
+            --version "$VER" \
+            --arch amd64 \
+            --out-dir /tmp/sh-deb-smoke
+
+  test-debian:
+    name: Linux Debian (12 Bookworm)
+    runs-on: ubuntu-24.04
+    container:
+      image: rust:1-bookworm
+    timeout-minutes: 30
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Python 3 for parity gate
+        run: |
+          apt-get -o Acquire::Retries=3 update
+          apt-get -o Acquire::Retries=3 install -y --no-install-recommends python3
+
+      - name: Cache Cargo registry and target (Debian Bookworm)
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: debian-bookworm
+
+      - name: Verify clean-room, firewall & UI parity on Debian 12
+        run: |
+          bash scripts/check-cleanroom.sh
+          bash scripts/check-firewall.sh
+          bash scripts/check-prototype-parity.sh
+
+      - name: Run full workspace test suite on Debian 12
+        run: cargo test --workspace --locked
+
+  test-macos:
+    name: macOS (Apple Silicon)
+    runs-on: macos-15
+    timeout-minutes: 30
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-rust
+        with:
+          cache-key: test-macos-15
+
+      - name: Verify clean-room, firewall & UI parity on macOS
+        run: |
+          bash scripts/check-cleanroom.sh
+          bash scripts/check-firewall.sh
+          bash scripts/check-prototype-parity.sh
+
+      - name: Run full workspace test suite on macOS
+        run: cargo test --workspace --locked
+
+  # Native Windows regression lane: validates Windows SQLite WAL, cmd/ConPTY shell runner,
+  # paths, CLI E2E, and ratatui prototype parity natively on windows-2022.
+  test-windows:
+    name: Windows (x64 MSVC)
+    runs-on: windows-2022
+    timeout-minutes: 35
+    needs: [changes]
+    if: needs.changes.outputs.code == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: ./.github/actions/setup-rust
+        with:
+          cache-key: test-windows-2022
+
+      - name: Run full workspace test suite on Windows
+        shell: pwsh
+        run: cargo test --workspace --locked
+
+      - name: Verify UI prototype parity & firewall on Windows
+        shell: bash
+        run: |
+          bash scripts/check-firewall.sh
+          bash scripts/check-prototype-parity.sh
+
+  # Aggregate gate only: no checkout, compile, or test execution.
+  # Preserves a single branch-protection check name and fails closed on any red/cancelled/skipped lane.
+  quality:
+    name: Format, Lint, Firewall, Parity, Cross-Platform Test
+    permissions: {}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    needs:
+      - changes
+      - static-fast
+      - test-ubuntu
+      - test-debian
+      - test-macos
+      - test-windows
+    if: always()
+    steps:
+      - name: Aggregate lane results
+        env:
+          CHANGES: ${{ needs.changes.result }}
+          CODE: ${{ needs.changes.outputs.code }}
+          STATIC_FAST: ${{ needs.static-fast.result }}
+          TEST_UBUNTU: ${{ needs.test-ubuntu.result }}
+          TEST_DEBIAN: ${{ needs.test-debian.result }}
+          TEST_MACOS: ${{ needs.test-macos.result }}
+          TEST_WINDOWS: ${{ needs.test-windows.result }}
+        run: |
+          fail=0
+          if [ "$CHANGES" != "success" ]; then
+            echo "changes=$CHANGES (filter must succeed)"
+            fail=1
+          fi
+          if [ "$CODE" != "true" ] && [ "$CODE" != "false" ]; then
+            echo "code=$CODE (filter must return true or false)"
+            fail=1
+          fi
+          if [ "$STATIC_FAST" != "success" ]; then
+            echo "static-fast=$STATIC_FAST"
+            fail=1
+          fi
+          for lane in "test-ubuntu=$TEST_UBUNTU" "test-debian=$TEST_DEBIAN" "test-macos=$TEST_MACOS" "test-windows=$TEST_WINDOWS"; do
+            name="${lane%%=*}"
+            result="${lane#*=}"
+            if [ "$CODE" != "true" ]; then
+              if [ "$result" != "skipped" ]; then
+                echo "$name=$result (docs-only run: expected skipped)"
+                fail=1
+              fi
+            elif [ "$result" != "success" ]; then
+              echo "$name=$result"
+              fail=1
+            fi
+          done
+          if [ "$fail" -ne 0 ]; then
+            echo "Open the red lane above, not this aggregate gate."
+            exit 1
+          fi

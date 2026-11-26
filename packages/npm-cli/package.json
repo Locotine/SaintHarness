@@ -1,0 +1,25 @@
+{
+  "name": "@saintharness/cli",
+  "version": "0.1.0",
+  "description": "SaintHarness pure Rust coding agent harness CLI (thin native binary launcher)",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Locotine/SaintHarness"
+  },
+  "bin": {
+    "saint-harness": "bin/saint-harness.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "README.md"
+  ],
+  "scripts": {
+    "postinstall": "node scripts/postinstall.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
