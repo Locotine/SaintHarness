@@ -106,44 +106,40 @@
         <!-- Session view (Landing when empty, Transcript when populated) -->
         <section id="session-view" class="session-view" aria-label="Active session">
           <div id="scroll-viewport" class="scroll-viewport">
-            <!-- Landing view (empty session) -->
+            <!-- Landing view (empty session, mirrors Saint Hyper Agent Home + prototype) -->
             <div id="landing-view" class="landing-view hidden">
+              <canvas id="ascii-wave" class="wave-canvas" aria-hidden="true"></canvas>
               <div class="landing-inner">
-                <svg class="saint-mark" width="56" height="56" viewBox="0 0 64 64" fill="none" aria-hidden="true">
-                  <!-- Crown (Saint Ember accent) -->
-                  <path d="M18 17L23 8L32 14L41 8L46 17H18Z" fill="var(--accent)"/>
-                  <rect x="20" y="18.5" width="24" height="2.8" rx="1.4" fill="var(--accent)"/>
-                  <!-- Shield -->
-                  <path d="M14 25.5C14 24.4 14.9 23.5 16 23.5H48C49.1 23.5 50 24.4 50 25.5V36.8C50 47.4 41.8 54.4 32 58C22.2 54.4 14 47.4 14 36.8V25.5Z" stroke="currentColor" stroke-width="3" fill="none"/>
-                  <!-- S ribbon inside shield -->
-                  <path d="M38.5 31.5C38.5 29.4 36.2 28.2 32.3 28.2C28.2 28.2 25.6 29.9 25.6 32.3C25.6 34.8 28.1 35.9 32.2 36.7C36.4 37.5 39 38.8 39 41.7C39 44.5 36.1 46.5 31.6 46.5C27.5 46.5 24.8 44.9 24.4 42.3" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                <svg
+                  id="saint-logo-svg"
+                  class="saint-mark"
+                  width="44"
+                  height="66"
+                  viewBox="0 0 402 610"
+                  fill="none"
+                  role="img"
+                  aria-label="Saint logo"
+                >
+                  <path id="saint-logo-path" fill="currentColor" fill-rule="evenodd" d=""></path>
                 </svg>
 
-                <h1 class="landing-heading">Let's build</h1>
-                <p id="landing-workspace-meta" class="landing-sub mono">Workspace</p>
-
-                <!-- Honest API key notice shown only when no cloud key is saved -->
-                <div id="landing-auth-banner" class="auth-callout hidden" role="status">
-                  <div class="auth-callout-text">
-                    <strong>No cloud API key configured yet.</strong>
-                    <span>Add an Anthropic, Gemini, DashScope, or local model endpoint to run turns.</span>
-                  </div>
-                  <button type="button" id="btn-landing-auth" class="primary-sm-btn">Configure API Keys</button>
+                <div class="landing-titles">
+                  <h1 class="landing-heading">Let's build</h1>
+                  <button type="button" id="btn-landing-workspace" class="landing-project-btn" title="Switch workspace folder">
+                    <span id="landing-workspace-meta">SaintHarness</span>
+                  </button>
                 </div>
 
-                <div class="starter-grid" aria-label="Quick prompts">
-                  <button type="button" class="starter-chip" data-prompt="Summarize the architecture and entry points of this workspace.">
-                    <span class="starter-title">Map this codebase</span>
-                    <span class="starter-desc">Inspect crates, modules, and entry points</span>
-                  </button>
-                  <button type="button" class="starter-chip" data-prompt="Run the test suite and report any failures or warnings with exact file paths.">
-                    <span class="starter-title">Check tests and lints</span>
-                    <span class="starter-desc">Verify current build health in sandbox</span>
-                  </button>
-                  <button type="button" class="starter-chip" data-prompt="Switch to read-only review and identify potential bugs or edge cases in recently modified files.">
-                    <span class="starter-title">Review recent changes</span>
-                    <span class="starter-desc">Read-only inspection of current diff</span>
-                  </button>
+                <div class="quiet-prompts" aria-label="Quick prompts">
+                  <button type="button" class="quiet-prompt" data-prompt="Summarize the architecture and entry points of this workspace.">Map architecture</button>
+                  <button type="button" class="quiet-prompt" data-prompt="Run the test suite and report any failures or warnings with exact file paths.">Check tests and lints</button>
+                  <button type="button" class="quiet-prompt" data-prompt="Switch to read-only review and identify potential bugs or edge cases in recently modified files.">Review recent changes</button>
+                </div>
+
+                <!-- Quiet inline API key notice shown only when no cloud key is saved -->
+                <div id="landing-auth-banner" class="auth-inline-hint hidden" role="status">
+                  <span>No cloud API key configured yet.</span>
+                  <button type="button" id="btn-landing-auth" class="inline-action-btn">Configure API Keys</button>
                 </div>
               </div>
             </div>
@@ -347,6 +343,7 @@
     <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
   </div>
 
+  <script src="./saint-logo.js" defer></script>
   <script src="./app.js" defer></script>
 </body>
 </html>

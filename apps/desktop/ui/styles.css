@@ -544,108 +544,155 @@ input:disabled {
   min-height: 0;
   overflow-y: auto;
   padding: 20px 24px 16px;
+  position: relative;
+}
+
+.scroll-viewport.is-landing {
+  padding: 0;
+  overflow: hidden;
+  display: flex;
 }
 
 .landing-view {
+  position: relative;
+  flex: 1 1 auto;
   min-height: 100%;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+
+.wave-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  z-index: 1;
 }
 
 .landing-inner {
+  position: relative;
+  z-index: 2;
   width: 100%;
-  max-width: 620px;
+  max-width: 600px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 12px;
-  padding: 16px 0;
+  gap: 16px;
+  padding: 24px;
+  pointer-events: none;
+  user-select: none;
 }
 
 .saint-mark {
+  display: block;
+  width: 44px;
+  height: 66px;
   color: var(--ink);
-  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.landing-titles {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
 }
 
 .landing-heading {
-  font-size: 26px;
+  font-size: 25px;
   font-weight: 600;
-  letter-spacing: -0.02em;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
   color: var(--ink);
 }
 
-.landing-sub {
-  font-size: 12px;
+.landing-project-btn {
+  pointer-events: auto;
+  appearance: none;
+  border: none;
+  background: transparent;
   color: var(--ink-tertiary);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  font-weight: 400;
+  padding: 2px 10px;
+  border-radius: 7px;
+  transition: background 120ms ease, color 120ms ease;
 }
 
-.auth-callout {
-  width: 100%;
-  margin-top: 8px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--border-heavy);
-  background: var(--panel);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  text-align: left;
-}
-
-.auth-callout-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 12.5px;
-}
-
-.auth-callout-text strong {
-  color: var(--status-blocked-ink);
-  font-weight: 600;
-}
-
-.auth-callout-text span {
+.landing-project-btn:hover {
+  background: var(--btn-hover);
   color: var(--ink-secondary);
 }
 
-.starter-grid {
-  width: 100%;
-  margin-top: 12px;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+.quiet-prompts {
+  pointer-events: auto;
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 2px;
 }
 
-.starter-chip {
+.quiet-prompt {
+  appearance: none;
   border: 1px solid var(--border);
   background: var(--panel);
-  color: var(--ink);
-  border-radius: 10px;
-  padding: 12px;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  transition: border-color 120ms ease, background 120ms ease;
-}
-
-.starter-chip:hover {
-  border-color: var(--border-heavy);
-  background: var(--control-bg);
-}
-
-.starter-title {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.starter-desc {
-  font-size: 11.5px;
   color: var(--ink-secondary);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.quiet-prompt:hover {
+  border-color: var(--accent-border);
+  color: var(--ink);
+  background: var(--elevated-bg);
+}
+
+.quiet-prompt:active {
+  background: var(--btn-active);
+}
+
+.auth-inline-hint {
+  pointer-events: auto;
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--ink-tertiary);
+  background: var(--surface);
+  padding: 4px 10px;
+  border-radius: 8px;
+}
+
+.inline-action-btn {
+  appearance: none;
+  border: 1px solid var(--border-heavy);
+  background: var(--panel);
+  color: var(--text-accent);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  white-space: nowrap;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.inline-action-btn:hover {
+  background: var(--control-bg);
+  border-color: var(--accent-border);
 }
 
 /* Transcript */

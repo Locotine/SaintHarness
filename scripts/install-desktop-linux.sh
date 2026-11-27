@@ -6,7 +6,7 @@ DESKTOP_DIR="$ROOT_DIR/apps/desktop"
 BIN_SRC="$DESKTOP_DIR/src-tauri/target/release/saint-harness-desktop"
 ICON_128="$DESKTOP_DIR/src-tauri/icons/128x128.png"
 ICON_256="$DESKTOP_DIR/src-tauri/icons/128x128@2x.png"
-ICON_SVG="$DESKTOP_DIR/src-tauri/icons/saint-icon.svg"
+ICON_512="$DESKTOP_DIR/src-tauri/icons/icon.png"
 
 if [[ ! -x "$BIN_SRC" ]]; then
   echo "error: release desktop binary not found at $BIN_SRC" >&2
@@ -18,14 +18,15 @@ BIN_DIR="${HOME}/.local/bin"
 APP_DIR="${HOME}/.local/share/applications"
 ICON_128_DIR="${HOME}/.local/share/icons/hicolor/128x128/apps"
 ICON_256_DIR="${HOME}/.local/share/icons/hicolor/256x256/apps"
-ICON_SVG_DIR="${HOME}/.local/share/icons/hicolor/scalable/apps"
+ICON_512_DIR="${HOME}/.local/share/icons/hicolor/512x512/apps"
 
-mkdir -p "$BIN_DIR" "$APP_DIR" "$ICON_128_DIR" "$ICON_256_DIR" "$ICON_SVG_DIR"
+mkdir -p "$BIN_DIR" "$APP_DIR" "$ICON_128_DIR" "$ICON_256_DIR" "$ICON_512_DIR"
 
 install -m 0755 "$BIN_SRC" "$BIN_DIR/saint-harness-desktop"
 install -m 0644 "$ICON_128" "$ICON_128_DIR/saint-harness.png"
 install -m 0644 "$ICON_256" "$ICON_256_DIR/saint-harness.png"
-install -m 0644 "$ICON_SVG" "$ICON_SVG_DIR/saint-harness.svg"
+install -m 0644 "$ICON_512" "$ICON_512_DIR/saint-harness.png"
+rm -f "${HOME}/.local/share/icons/hicolor/scalable/apps/saint-harness.svg"
 
 cat >"$APP_DIR/saint-harness.desktop" <<EOF
 [Desktop Entry]

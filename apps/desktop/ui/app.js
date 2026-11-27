@@ -352,12 +352,18 @@
 
     const sess = activeSession();
     const hasMessages = Boolean(sess && sess.messages && sess.messages.length > 0);
+    $("scroll-viewport").classList.toggle("is-landing", !hasMessages);
     $("landing-view").classList.toggle("hidden", hasMessages);
     $("transcript").classList.toggle("hidden", !hasMessages);
 
     if (!hasMessages) {
-      $("landing-workspace-meta").textContent = state.workspace.path || state.workspace.name;
+      $("landing-workspace-meta").textContent = state.workspace.name || state.workspace.path || "Workspace";
+      $("btn-landing-workspace").title = state.workspace.path || "Switch workspace folder";
       $("landing-auth-banner").classList.toggle("hidden", state.auth.has_any_configured_key);
+      if (typeof wakeAsciiWave === "function") {
+        resizeAsciiWave();
+        wakeAsciiWave(5000);
+      }
     } else {
       renderTranscript(sess);
     }
@@ -1545,8 +1551,9 @@
 
     $("btn-send").addEventListener("click", () => handleSubmitPrompt());
     $("btn-stop").addEventListener("click", handleInterrupt);
+    $("btn-landing-workspace").addEventListener("click", handleOpenWorkspace);
 
-    document.querySelectorAll(".starter-chip").forEach((chip) => {
+    document.querySelectorAll(".quiet-prompt").forEach((chip) => {
       chip.addEventListener("click", () => {
         const prompt = chip.getAttribute("data-prompt");
         if (prompt) handleSubmitPrompt(prompt);
@@ -1762,16 +1769,129 @@
       wasWide = nowWide;
       renderSidebar();
       renderHeader();
+      resizeAsciiWave();
+      wakeAsciiWave(0);
     });
   }
 
+  // =========================================================================
+  // AMBIENT ASCII WAVE (mirrors Saint Hyper Agent AsciiWaveBackground + prototype)
+  // Moves gently for 5s when landing opens, then settles; clicks emit a Saint Ember ripple.
+  // =========================================================================
+  const WAVE_GLYPHS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  const WAVE_CELL_W = 10;
+  const WAVE_CELL_H = 14;
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  let waveCols = 0;
+  let waveRows = 0;
+  let waveGlyphs = [];
+  let waveRipples = [];
+  let waveUntil = 0;
+  let waveFrames = 0;
+
+  function wakeAsciiWave(ms) {
+    waveFrames = 1;
+    waveUntil = reduceMotion.matches ? 0 : Math.max(waveUntil, performance.now() + ms);
+  }
+
+  function resizeAsciiWave() {
+    const canvas = $("ascii-wave");
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(rect.height * dpr);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    waveCols = Math.ceil(rect.width / WAVE_CELL_W);
+    waveRows = Math.ceil(rect.height / WAVE_CELL_H);
+    waveGlyphs = Array.from(
+      { length: waveCols * waveRows },
+      () => WAVE_GLYPHS[Math.floor(Math.random() * WAVE_GLYPHS.length)]
+    );
+  }
+
+  function drawAsciiWave(now) {
+    const canvas = $("ascii-wave");
+    const landingVisible = canvas && !$("landing-view").classList.contains("hidden");
+    const active = now < waveUntil || waveFrames > 0;
+    if (active && landingVisible && waveCols > 0) {
+      waveFrames = 0;
+      const ctx = canvas.getContext("2d");
+      const rect = canvas.getBoundingClientRect();
+      if (ctx && rect.width && rect.height) {
+        ctx.clearRect(0, 0, rect.width, rect.height);
+        ctx.font = '10px "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace';
+        ctx.textBaseline = "top";
+        const isDark = document.documentElement.classList.contains("dark");
+        const inkRgb = isDark ? "252,252,252" : "13,13,13";
+        const accRgb = isDark ? "242,97,45" : "199,70,20";
+        const t = now * 0.00042;
+        while (waveRipples.length && now - waveRipples[0].t > 2400) waveRipples.shift();
+        for (let r = 0; r < waveRows; r++) {
+          const y = r * WAVE_CELL_H;
+          for (let c = 0; c < waveCols; c++) {
+            const x = c * WAVE_CELL_W;
+            const idx = r * waveCols + c;
+            const n =
+              Math.sin(c * 0.11 + t) * Math.cos(r * 0.14 - t * 0.8) +
+              Math.sin((c + r) * 0.07 + t * 1.4) * 0.5;
+            const inkAlpha = n > 0.36 ? Math.min(0.13, (n - 0.36) * 0.15) : 0;
+            let accAlpha = 0;
+            for (const rip of waveRipples) {
+              const age = now - rip.t;
+              const band = Math.abs(Math.hypot(x - rip.x, y - rip.y) - age * 0.34);
+              if (band < 28) {
+                accAlpha = Math.max(accAlpha, (1 - band / 28) * (1 - age / 2400) * 0.72);
+                if (Math.random() < 0.15) {
+                  waveGlyphs[idx] = WAVE_GLYPHS[Math.floor(Math.random() * WAVE_GLYPHS.length)];
+                }
+              }
+            }
+            if (inkAlpha > 0.01 && Math.random() < 0.01) {
+              waveGlyphs[idx] = WAVE_GLYPHS[Math.floor(Math.random() * WAVE_GLYPHS.length)];
+            }
+            if (accAlpha > 0.02) {
+              ctx.fillStyle = `rgba(${accRgb},${accAlpha.toFixed(3)})`;
+              ctx.fillText(waveGlyphs[idx], x, y);
+            } else if (inkAlpha > 0.01) {
+              ctx.fillStyle = `rgba(${inkRgb},${inkAlpha.toFixed(3)})`;
+              ctx.fillText(waveGlyphs[idx], x, y);
+            }
+          }
+        }
+      }
+    }
+    requestAnimationFrame(drawAsciiWave);
+  }
+
   async function init() {
+    // Hydrate official Saint SVG emblem path
+    const logoPath = $("saint-logo-path");
+    if (logoPath && typeof window.SAINT_LOGO_PATH === "string") {
+      logoPath.setAttribute("d", window.SAINT_LOGO_PATH);
+    }
+
+    const waveCanvas = $("ascii-wave");
+    if (waveCanvas) {
+      waveCanvas.addEventListener("click", (ev) => {
+        if (reduceMotion.matches) return;
+        const rect = waveCanvas.getBoundingClientRect();
+        waveRipples.push({ x: ev.clientX - rect.left, y: ev.clientY - rect.top, t: performance.now() });
+        if (waveRipples.length > 5) waveRipples.shift();
+        wakeAsciiWave(2400);
+      });
+    }
+
     let savedTheme = "dark";
     try {
       savedTheme = localStorage.getItem("saint-harness-desktop-theme") || "dark";
     } catch (_) {}
     applyTheme(savedTheme);
     bindEvents();
+    $("btn-theme").addEventListener("click", () => wakeAsciiWave(0));
 
     if (window.__TAURI__ && window.__TAURI__.event && window.__TAURI__.event.listen) {
       await window.__TAURI__.event.listen("saint-event", (event) => {
@@ -1782,6 +1902,9 @@
     }
 
     await bootstrap();
+    resizeAsciiWave();
+    wakeAsciiWave(5000);
+    requestAnimationFrame(drawAsciiWave);
   }
 
   document.addEventListener("DOMContentLoaded", init);
