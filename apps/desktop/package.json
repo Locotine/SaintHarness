@@ -1,6 +1,6 @@
 {
   "name": "saint-harness-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "SaintHarness native desktop application powered by Tauri v2 and embedded saint-harness-server",
   "scripts": {

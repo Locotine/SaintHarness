@@ -1,6 +1,6 @@
 {
   "name": "@saintharness/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "SaintHarness pure Rust coding agent harness CLI (thin native binary launcher)",
   "license": "MIT",
   "type": "module",
