@@ -138,8 +138,13 @@ fn is_resource_within_scope(
     resource: &str,
 ) -> bool {
     let p = Path::new(resource);
-    if !p.is_absolute() {
-        return !resource.contains("..");
+    if p.components()
+        .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
+        return false;
+    }
+    if !p.is_absolute() && !p.has_root() {
+        return true;
     }
     if p.starts_with(workspace_root) {
         return true;
@@ -148,7 +153,7 @@ fn is_resource_within_scope(
 }
 
 fn is_sensitive_file(resource: &str) -> bool {
-    let lower = resource.to_ascii_lowercase();
+    let lower = resource.replace('\\', "/").to_ascii_lowercase();
     lower.ends_with(".env")
         || lower.contains("/.env.")
         || lower.contains(".ssh/")

@@ -38,6 +38,14 @@ mod tests {
             evaluate_permission(&policy, &ws, "edit", "/etc/hosts", None, &[]),
             PermissionEffect::Ask
         );
+        assert_eq!(
+            evaluate_permission(&policy, &ws, "edit", "/repo/../etc/hosts", None, &[]),
+            PermissionEffect::Ask
+        );
+        assert_eq!(
+            evaluate_permission(&policy, &ws, "edit", r"repo\.env.local", None, &[]),
+            PermissionEffect::Ask
+        );
         policy.runtime_mode = RuntimeMode::FullAccess;
         assert_eq!(
             evaluate_permission(&policy, &ws, "shell", "rm -rf /tmp/x", None, &[]),
