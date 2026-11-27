@@ -9,14 +9,19 @@ This document describes the versioning policy, cross-platform build matrix, Linu
 SaintHarness follows strict Semantic Versioning (`MAJOR.MINOR.PATCH`):
 
 - **Git tag format:** `vX.Y.Z` (for example, `v0.1.0`).
-- **Single source of truth:** `scripts/release/sync-version.py` validates strict SemVer and synchronizes the version string across:
+- **Single source of truth:** `scripts/release/sync-version.py` validates strict SemVer and synchronizes the version string across all CLI and Desktop manifests:
   - Root workspace `Cargo.toml` (`[workspace.package] version`)
   - npm thin wrapper `packages/npm-cli/package.json` (`version`)
+  - Desktop wrapper `apps/desktop/package.json` (`version`)
+  - Desktop Rust crate `apps/desktop/src-tauri/Cargo.toml` (`[package] version`)
+  - Tauri v2 bundle config `apps/desktop/src-tauri/tauri.conf.json` (`version`)
 - **Automated enforcement:** The `preflight` job in `.github/workflows/release.yml` normalizes and validates the tag or `workflow_dispatch` input before any build runner starts.
 
 ---
 
 ## 2. Target Matrix & Published Assets
+
+### CLI / TUI Matrix (`build_release`)
 
 Every production release compiles the stripped `saint-harness` binary with `--features acp` across five native targets:
 
@@ -28,9 +33,20 @@ Every production release compiles the stripped `saint-harness` binary with `--fe
 | `mac-x64` | `macos-15` | `x86_64-apple-darwin` | `saint-harness_<ver>_darwin-x86_64.tar.gz` |
 | `win-x64` | `windows-2022` | `x86_64-pc-windows-msvc` | `saint-harness_<ver>_windows-x86_64.zip` |
 
+### Native Desktop App Matrix (`build_desktop`, Tauri v2)
+
+When `include_desktop=true` (always enabled on `v*.*.*` tag pushes), `build_desktop` compiles the native desktop application embedding `saint-harness-server` in-process across four native targets:
+
+| Desktop ID | GitHub Runner | Rust Target | Desktop Installer Assets |
+| :--- | :--- | :--- | :--- |
+| `desktop-linux-x64` | `ubuntu-22.04` | `x86_64-unknown-linux-gnu` | `saint-harness-desktop_<ver>_amd64.deb` |
+| `desktop-mac-arm64` | `macos-15` | `aarch64-apple-darwin` | `saint-harness-desktop_<ver>_aarch64.dmg` |
+| `desktop-mac-x64` | `macos-15` | `x86_64-apple-darwin` | `saint-harness-desktop_<ver>_x64.dmg` |
+| `desktop-win-x64` | `windows-2022` | `x86_64-pc-windows-msvc` | `saint-harness-desktop_<ver>_x64-setup.exe`, `saint-harness-desktop_<ver>_x64.msi` |
+
 ### Complete GitHub Release Asset Inventory
 
-The `publish_release` job fails closed if any of the 7 platform binary bundles is missing, then publishes:
+The `publish_release` job fails closed if any of the 7 CLI platform bundles or (when `include_desktop=true`) 5 Desktop installers is missing, then publishes:
 
 1. `saint-harness_<ver>_linux-x86_64.tar.gz`
 2. `saint-harness_<ver>_amd64.deb`
@@ -39,13 +55,18 @@ The `publish_release` job fails closed if any of the 7 platform binary bundles i
 5. `saint-harness_<ver>_darwin-arm64.tar.gz`
 6. `saint-harness_<ver>_darwin-x86_64.tar.gz`
 7. `saint-harness_<ver>_windows-x86_64.zip`
-8. `SHA256SUMS.txt` (SHA-256 digests for all 7 binary assets, used by `install.sh` and `install.ps1`)
-9. `release-manifest.json` (structured download URLs, sizes, and SHA-256 digests consumed by `saint-harness update` and `@saintharness/cli`)
-10. `install.sh` (macOS / Debian / Ubuntu installer)
-11. `install.ps1` (Windows x64 PowerShell installer)
-12. `saint-harness.rb` (Homebrew Formula)
-13. `saint-harness.scoop.json` (Scoop manifest)
-14. `saint-harness_<ver>_winget-manifests.tar.gz` (WinGet `version`, `installer`, and `locale` YAML files)
+8. `saint-harness-desktop_<ver>_amd64.deb`
+9. `saint-harness-desktop_<ver>_aarch64.dmg`
+10. `saint-harness-desktop_<ver>_x64.dmg`
+11. `saint-harness-desktop_<ver>_x64-setup.exe`
+12. `saint-harness-desktop_<ver>_x64.msi`
+13. `SHA256SUMS.txt` (SHA-256 digests for all CLI and Desktop release assets)
+14. `release-manifest.json` (structured `platforms` and `desktop` download URLs, sizes, and SHA-256 digests consumed by `saint-harness update` and `@saintharness/cli`)
+15. `install.sh` (macOS / Debian / Ubuntu CLI installer)
+16. `install.ps1` (Windows x64 PowerShell CLI installer)
+17. `saint-harness.rb` (Homebrew Formula)
+18. `saint-harness.scoop.json` (Scoop manifest)
+19. `saint-harness_<ver>_winget-manifests.tar.gz` (WinGet `version`, `installer`, and `locale` YAML files)
 
 ---
 
@@ -84,12 +105,13 @@ A single `.deb` and `.tar.gz` per architecture must run across Debian 12 (Bookwo
 
 ## 4. Release Pipeline Overview
 
-`.github/workflows/release.yml` runs four sequential stages:
+`.github/workflows/release.yml` runs five coordinated jobs (with `.github/workflows/ci-desktop.yml` gating Desktop PR and `main` changes across Ubuntu 24.04, macOS 15, and Windows 2022):
 
 1. **`preflight` (`ubuntu-24.04`):** Normalizes SemVer, runs `test_ci_contracts.py`, `check-cleanroom.sh`, `check-firewall.sh`, `check-prototype-parity.sh`, `cargo fmt --check`, `cargo clippy -- -D warnings`, and `cargo test --workspace --locked`.
-2. **`build_release` (5-runner matrix):** Synchronizes workspace version, builds stripped `saint-harness --features acp`, runs OS-specific verification and smoke tests, packages `.tar.gz` / `.deb` / `.zip`, and uploads workflow artifacts.
-3. **`verify_debian_ubuntu` (4-distro container matrix):** Installs `amd64.deb` via `apt-get` inside Debian 12, Debian 13, Ubuntu 22.04, and Ubuntu 24.04 containers and executes CLI smoke tests.
-4. **`publish_release` (`ubuntu-24.04`, scoped `contents: write`):** Downloads all platform artifacts, stages `install.sh` and `install.ps1`, generates `SHA256SUMS.txt`, `release-manifest.json`, Homebrew/Scoop/WinGet manifests, and creates or updates the GitHub Release via `gh release`.
+2. **`build_release` (5-runner CLI matrix):** Synchronizes workspace version, builds stripped `saint-harness --features acp`, runs OS-specific verification and smoke tests, packages `.tar.gz` / `.deb` / `.zip`, and uploads workflow artifacts.
+3. **`build_desktop` (4-runner Tauri v2 matrix, runs in parallel with `build_release` when `include_desktop=true`):** Synchronizes versions across all 5 manifests, compiles the native desktop app (`npx tauri build --ci`) on `ubuntu-22.04`, `macos-15` (arm64 + x64), and `windows-2022`, standardizes `saint-harness-desktop_<ver>_*` installer filenames, and uploads workflow artifacts.
+4. **`verify_debian_ubuntu` (4-distro container matrix):** Installs CLI `saint-harness_<ver>_amd64.deb` via `apt-get` inside Debian 12, Debian 13, Ubuntu 22.04, and Ubuntu 24.04 containers and executes CLI smoke tests.
+5. **`publish_release` (`ubuntu-24.04`, scoped `contents: write`):** Downloads all CLI and Desktop artifacts, stages `install.sh` and `install.ps1`, generates `SHA256SUMS.txt` and `release-manifest.json` (with `--require-desktop` when `include_desktop=true`), builds Homebrew/Scoop/WinGet manifests, and creates or updates the GitHub Release via `gh release`.
 
 ---
 
@@ -101,6 +123,7 @@ Ensure `main` is clean and every local quality gate passes:
 
 ```bash
 make all
+make desktop-check
 make release-full
 ```
 
@@ -119,19 +142,21 @@ Trigger a dry-run in GitHub Actions without publishing a public GitHub Release:
 gh workflow run release.yml \
   -f version=0.2.0 \
   -f publish_release=false \
-  -f platform=all
+  -f platform=all \
+  -f include_desktop=true
 ```
 
-To test a single runner rapidly (for example, `linux-x64` or `win-x64`), set `-f platform=linux-x64`. Inspect the uploaded workflow artifacts and verify `verify_debian_ubuntu` passes across all four containers.
+To test a single CLI runner rapidly (for example, `linux-x64` or `win-x64`), set `-f platform=linux-x64 -f include_desktop=false`. Inspect the uploaded workflow artifacts and verify `verify_debian_ubuntu` passes across all four containers.
 
 ### Step 3: Bump Version and Push Release Tag
 
-Synchronize the version across Cargo and npm, commit, and push the `vX.Y.Z` tag:
+Synchronize the version across Cargo, npm, and Tauri Desktop manifests, commit, and push the `vX.Y.Z` tag:
 
 ```bash
 python3 scripts/release/sync-version.py --sync 0.2.0
+python3 scripts/release/sync-version.py --verify 0.2.0
 git status
-git add Cargo.toml packages/npm-cli/package.json
+git add Cargo.toml packages/npm-cli/package.json apps/desktop/package.json apps/desktop/src-tauri/Cargo.toml apps/desktop/src-tauri/tauri.conf.json
 git commit -m "chore(release): prepare v0.2.0"
 git tag v0.2.0
 git push origin main --tags
@@ -241,8 +266,8 @@ Prefer a forward patch release (`vX.Y.(Z+1)`) over mutating published artifacts 
 
 | Script | Purpose |
 | :--- | :--- |
-| `scripts/release/sync-version.py` | Normalizes strict SemVer (`--normalize`) and syncs `Cargo.toml` + `packages/npm-cli/package.json` (`--sync`). |
-| `scripts/release/build-deb.sh` | Builds `amd64`/`arm64` `.deb` packages, enforces `GLIBC <= 2.35`, rejects `*t64*` deps, and checks package layout. |
-| `scripts/release/generate-manifest.py` | Computes `SHA256SUMS.txt` and `release-manifest.json`; fails closed if any of the 7 platform bundles is missing. |
+| `scripts/release/sync-version.py` | Normalizes strict SemVer (`--normalize`), syncs (`--sync`), and verifies (`--verify`) all 5 manifests (`Cargo.toml`, `packages/npm-cli/package.json`, `apps/desktop/package.json`, `apps/desktop/src-tauri/Cargo.toml`, `apps/desktop/src-tauri/tauri.conf.json`). |
+| `scripts/release/build-deb.sh` | Builds CLI `amd64`/`arm64` `.deb` packages, enforces `GLIBC <= 2.35`, rejects `*t64*` deps, and checks package layout. |
+| `scripts/release/generate-manifest.py` | Computes `SHA256SUMS.txt` and `release-manifest.json` (`platforms` + optional `desktop`); fails closed if any of the 7 CLI bundles or (with `--require-desktop`) 5 Desktop installers is missing. |
 | `scripts/release/generate-package-manifests.py` | Generates `saint-harness.rb`, `saint-harness.scoop.json`, and WinGet YAML manifests from `release-manifest.json`. |
 | `scripts/release/build-apt-repo.sh` | Generates a static APT repository (`pool/main`, `Packages`, `Packages.gz`, `Release`) from built `.deb` files. |

@@ -19,6 +19,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 CI_YML = ROOT / ".github/workflows/ci.yml"
+CI_DESKTOP_YML = ROOT / ".github/workflows/ci-desktop.yml"
 NIGHTLY_YML = ROOT / ".github/workflows/ci-nightly.yml"
 RELEASE_YML = ROOT / ".github/workflows/release.yml"
 SETUP_ACTION = ROOT / ".github/actions/setup-rust/action.yml"
@@ -46,6 +47,7 @@ class TestCiContracts(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.ci_text = CI_YML.read_text(encoding="utf-8")
+        cls.ci_desktop_text = CI_DESKTOP_YML.read_text(encoding="utf-8")
         cls.nightly_text = NIGHTLY_YML.read_text(encoding="utf-8")
         cls.release_text = RELEASE_YML.read_text(encoding="utf-8")
         cls.setup_text = SETUP_ACTION.read_text(encoding="utf-8")
@@ -78,7 +80,7 @@ class TestCiContracts(unittest.TestCase):
             import yaml  # type: ignore
         except ImportError:
             return
-        for wf in [CI_YML, NIGHTLY_YML, RELEASE_YML, SETUP_ACTION]:
+        for wf in [CI_YML, CI_DESKTOP_YML, NIGHTLY_YML, RELEASE_YML, SETUP_ACTION]:
             parsed = yaml.safe_load(wf.read_text(encoding="utf-8"))
             self.assertIsInstance(parsed, dict, f"{wf} failed to parse as YAML mapping")
 
@@ -156,8 +158,26 @@ class TestCiContracts(unittest.TestCase):
             "scripts/release/generate-package-manifests.py",
             "scripts/install.sh",
             "scripts/install.ps1",
+            '"id":"desktop-linux-x64"',
+            '"id":"desktop-mac-arm64"',
+            '"id":"desktop-mac-x64"',
+            '"id":"desktop-win-x64"',
+            "tauri build --ci",
+            "--require-desktop",
         ]:
             self.assertIn(token, self.release_text, f"release.yml missing required item: {token}")
+
+        for token in [
+            "ubuntu-24.04",
+            "macos-15",
+            "windows-2022",
+            "libwebkit2gtk-4.1-dev",
+            "apps/desktop/src-tauri",
+            "cargo clippy --all-targets -- -D warnings",
+            "cargo test --locked",
+            "node --check apps/desktop/ui/app.js",
+        ]:
+            self.assertIn(token, self.ci_desktop_text, f"ci-desktop.yml missing required item: {token}")
 
         install_sh = (ROOT / "scripts/install.sh").read_text(encoding="utf-8")
         self.assertIn("# SaintHarness PATH", install_sh)
@@ -208,6 +228,26 @@ class TestCiContracts(unittest.TestCase):
             with self.assertRaises(ValueError):
                 mod.normalize_release_version(invalid)
 
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "Cargo.toml").write_text('[workspace.package]\nversion = "0.1.0"\n', encoding="utf-8")
+            (root / "packages/npm-cli").mkdir(parents=True)
+            (root / "packages/npm-cli/package.json").write_text('{"name":"@saintharness/cli","version":"0.1.0"}\n', encoding="utf-8")
+            (root / "apps/desktop/src-tauri").mkdir(parents=True)
+            (root / "apps/desktop/package.json").write_text('{"name":"saint-harness-desktop","version":"0.1.0"}\n', encoding="utf-8")
+            (root / "apps/desktop/src-tauri/Cargo.toml").write_text('[package]\nname = "saint-harness-desktop"\nversion = "0.1.0"\n', encoding="utf-8")
+            (root / "apps/desktop/src-tauri/tauri.conf.json").write_text('{"productName":"SaintHarness","version":"0.1.0"}\n', encoding="utf-8")
+
+            self.assertEqual(mod.sync_workspace_version("v0.2.5", root), "0.2.5")
+            self.assertEqual(mod.verify_all_versions("0.2.5", root), "0.2.5")
+            self.assertIn('version = "0.2.5"', (root / "apps/desktop/src-tauri/Cargo.toml").read_text(encoding="utf-8"))
+            self.assertEqual(json.loads((root / "apps/desktop/src-tauri/tauri.conf.json").read_text(encoding="utf-8"))["version"], "0.2.5")
+
+            # Drift in desktop manifest must fail --verify
+            (root / "apps/desktop/package.json").write_text('{"name":"saint-harness-desktop","version":"0.1.0"}\n', encoding="utf-8")
+            with self.assertRaises(ValueError):
+                mod.verify_all_versions("0.2.5", root)
+
     def test_generate_manifest_fails_closed_on_missing_and_writes_all_platforms(self) -> None:
         mod = load_module("generate_manifest", ROOT / "scripts/release/generate-manifest.py")
         with tempfile.TemporaryDirectory() as tmp:
@@ -224,11 +264,27 @@ class TestCiContracts(unittest.TestCase):
                     out_dir=art,
                 )
 
-            # Populate all 7 expected platform artifacts + installers
+            # Populate all 7 expected CLI platform artifacts + installers
             for fname in mod.expected_platform_files("0.1.0").values():
                 (art / fname).write_bytes(f"payload:{fname}\n".encode("utf-8"))
             (art / "install.sh").write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             (art / "install.ps1").write_text("# ps1\n", encoding="utf-8")
+
+            # Requiring desktop before desktop files exist must fail closed
+            with self.assertRaises(RuntimeError):
+                mod.generate_release_outputs(
+                    artifacts_dir=art,
+                    version="0.1.0",
+                    tag="v0.1.0",
+                    repo="Locotine/SaintHarness",
+                    commit="deadbeef",
+                    out_dir=art,
+                    require_desktop=True,
+                )
+
+            # Populate all 5 Desktop installers and verify manifest + checksums
+            for fname in mod.expected_desktop_files("0.1.0").values():
+                (art / fname).write_bytes(f"desktop:{fname}\n".encode("utf-8"))
 
             manifest = mod.generate_release_outputs(
                 artifacts_dir=art,
@@ -237,15 +293,21 @@ class TestCiContracts(unittest.TestCase):
                 repo="Locotine/SaintHarness",
                 commit="deadbeef",
                 out_dir=art,
+                require_desktop=True,
             )
             self.assertEqual(len(manifest["platforms"]), 7)
+            self.assertEqual(len(manifest["desktop"]), 5)
             sums = (art / "SHA256SUMS.txt").read_text(encoding="utf-8")
             self.assertIn("saint-harness_0.1.0_amd64.deb", sums)
             self.assertIn("saint-harness_0.1.0_darwin-arm64.tar.gz", sums)
             self.assertIn("saint-harness_0.1.0_windows-x86_64.zip", sums)
+            self.assertIn("saint-harness-desktop_0.1.0_amd64.deb", sums)
+            self.assertIn("saint-harness-desktop_0.1.0_aarch64.dmg", sums)
+            self.assertIn("saint-harness-desktop_0.1.0_x64-setup.exe", sums)
             parsed = json.loads((art / "release-manifest.json").read_text(encoding="utf-8"))
             self.assertEqual(parsed["version"], "0.1.0")
             self.assertEqual(parsed["platforms"]["linux-x86_64-deb"]["filename"], "saint-harness_0.1.0_amd64.deb")
+            self.assertEqual(parsed["desktop"]["linux-x86_64-deb"]["filename"], "saint-harness-desktop_0.1.0_amd64.deb")
 
 
 if __name__ == "__main__":

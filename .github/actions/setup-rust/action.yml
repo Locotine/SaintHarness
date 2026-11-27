@@ -14,6 +14,10 @@ inputs:
     description: Optional extra key suffix for Swatinem/rust-cache
     required: false
     default: ""
+  workspaces:
+    description: Cargo workspace path for Swatinem/rust-cache
+    required: false
+    default: "."
 
 runs:
   using: composite
@@ -27,5 +31,6 @@ runs:
     - name: Cache Cargo registry and target
       uses: Swatinem/rust-cache@v2
       with:
+        workspaces: ${{ inputs.workspaces }}
         key: ${{ inputs.cache-key }}
         shared-key: ${{ runner.os }}-${{ runner.arch }}-${{ inputs.target || 'native' }}

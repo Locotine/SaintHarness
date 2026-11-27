@@ -1,20 +1,18 @@
 #!/usr/bin/env python3
-"""Generate SHA256SUMS.txt and release-manifest.json for SaintHarness releases."""
+"""Generate SHA256SUMS.txt and release-manifest.json for SaintHarness CLI & Desktop releases."""
 
 import argparse
 import datetime as dt
 import hashlib
+import importlib.util
 import json
 import sys
 from pathlib import Path
 
-from pathlib import Path as _P
-sys.path.insert(0, str(_P(__file__).resolve().parent))
-import importlib.util
+_THIS_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(_THIS_DIR))
 
-_sync_spec = importlib.util.spec_from_file_location(
-    "sync_version", _P(__file__).resolve().parent / "sync-version.py"
-)
+_sync_spec = importlib.util.spec_from_file_location("sync_version", _THIS_DIR / "sync-version.py")
 assert _sync_spec and _sync_spec.loader
 _sync_mod = importlib.util.module_from_spec(_sync_spec)
 _sync_spec.loader.exec_module(_sync_mod)
@@ -41,6 +39,16 @@ def expected_platform_files(version: str) -> dict[str, str]:
     }
 
 
+def expected_desktop_files(version: str) -> dict[str, str]:
+    return {
+        "linux-x86_64-deb": f"saint-harness-desktop_{version}_amd64.deb",
+        "darwin-aarch64-dmg": f"saint-harness-desktop_{version}_aarch64.dmg",
+        "darwin-x86_64-dmg": f"saint-harness-desktop_{version}_x64.dmg",
+        "windows-x86_64-exe": f"saint-harness-desktop_{version}_x64-setup.exe",
+        "windows-x86_64-msi": f"saint-harness-desktop_{version}_x64.msi",
+    }
+
+
 def generate_release_outputs(
     artifacts_dir: Path,
     version: str,
@@ -49,9 +57,11 @@ def generate_release_outputs(
     commit: str,
     out_dir: Path,
     allow_partial: bool = False,
+    require_desktop: bool = False,
 ) -> dict:
     clean_version = normalize_release_version(version)
     expected = expected_platform_files(clean_version)
+    expected_desktop = expected_desktop_files(clean_version)
     download_base = f"https://github.com/{repo}/releases/download/{tag}"
 
     platforms: dict[str, dict] = {}
@@ -71,7 +81,27 @@ def generate_release_outputs(
 
     if missing and not allow_partial:
         raise RuntimeError(
-            "Missing required release artifacts:\n  - " + "\n  - ".join(missing)
+            "Missing required CLI release artifacts:\n  - " + "\n  - ".join(missing)
+        )
+
+    desktop: dict[str, dict] = {}
+    missing_desktop: list[str] = []
+    for desk_key, filename in expected_desktop.items():
+        candidate = artifacts_dir / filename
+        if not candidate.is_file() or candidate.stat().st_size == 0:
+            missing_desktop.append(f"{desk_key} ({filename})")
+            continue
+        desktop[desk_key] = {
+            "filename": filename,
+            "url": f"{download_base}/{filename}",
+            "sha256": sha256_file(candidate),
+            "size": candidate.stat().st_size,
+        }
+
+    if require_desktop and missing_desktop and not allow_partial:
+        raise RuntimeError(
+            "Missing required Desktop release artifacts:\n  - "
+            + "\n  - ".join(missing_desktop)
         )
 
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -99,6 +129,9 @@ def generate_release_outputs(
         "checksums_url": f"{download_base}/SHA256SUMS.txt",
         "platforms": platforms,
     }
+    if desktop:
+        manifest["desktop"] = desktop
+
     manifest_path = out_dir / "release-manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     return manifest
@@ -113,6 +146,7 @@ def main() -> int:
     parser.add_argument("--commit", required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--allow-partial", action="store_true")
+    parser.add_argument("--require-desktop", action="store_true")
     args = parser.parse_args()
 
     try:
@@ -124,9 +158,11 @@ def main() -> int:
             commit=args.commit,
             out_dir=args.out_dir,
             allow_partial=args.allow_partial,
+            require_desktop=args.require_desktop,
         )
+        desk_count = len(manifest.get("desktop", {}))
         print(
-            f"[generate-manifest] Wrote release-manifest.json ({len(manifest['platforms'])} platforms) and SHA256SUMS.txt"
+            f"[generate-manifest] Wrote release-manifest.json ({len(manifest['platforms'])} CLI, {desk_count} Desktop) and SHA256SUMS.txt"
         )
         return 0
     except Exception as exc:

@@ -1,14 +1,14 @@
 # SaintHarness
 
-**Pure Rust coding agent harness: interactive terminal UI, SQLite WAL daemon, sandboxed tool runner, and IDE bridge in a single native binary.**
+**Pure Rust coding agent harness: native Tauri v2 desktop app, interactive terminal UI, SQLite WAL daemon, sandboxed tool runner, and IDE bridge.**
 
 [![Rust Edition 2024](https://img.shields.io/badge/Rust-2024%20(MSRV%201.85)-orange.svg)](Cargo.toml)
 [![Platforms](https://img.shields.io/badge/Platforms-macOS%20%7C%20Debian%20%7C%20Ubuntu%20%7C%20Windows-blue.svg)](RELEASE.md)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](Cargo.toml)
 
-SaintHarness compiles a 15-crate Rust workspace into one self-contained executable (`21 MB` default stripped, `25 MB` with all optional accelerators) with `< 5 ms` cold start, zero Node.js or Python runtime dependencies, and zero hardcoded provider model versions.
+SaintHarness compiles a 15-crate Rust workspace into both a self-contained CLI/TUI executable (`21 MB` default stripped, `< 5 ms` cold start) and a native **Tauri v2 Desktop App** (`9.8 MB` `.deb`) with an in-process embedded Rust server, zero Node.js or Python runtime dependencies, and zero hardcoded provider model versions.
 
-![SaintHarness interactive workspace in Saint Dark with expanded tool trace and Hashline split diff drawer](docs/images/tui-workspace-diff-dark.png)
+![SaintHarness native desktop app home screen with official Saint emblem and interactive ASCII wave](docs/images/desktop-home-saint-dark.png)
 
 ---
 
@@ -21,11 +21,23 @@ SaintHarness compiles a 15-crate Rust workspace into one self-contained executab
 - **OS-Enforced Shell Sandboxing:** Runs shell commands under Linux Landlock LSM, macOS Seatbelt (`sandbox-exec`), or Windows JobObject / restricted execution with automatic secret scrubbing (`*_API_KEY`, `*_TOKEN`, `*_SECRET`).
 - **Dynamic Model Resolution (Zero Hardcoded Provider Versions):** Resolves `exact:*`, `latest_family:*`, and `latest_flagship` selectors against live provider catalogs (`GET /v1/models`, `/v1beta/models`, `/models`) with ETag caching and local fallback.
 - **Local-Only Credentials & Zero Telemetry:** API keys and custom routes live strictly in `~/.saint-harness/settings.json` (`chmod 0600`), never in SQLite, and outbound traffic connects directly over pure Rust `rustls-tls` to your configured provider or local inference server (SGLang / vLLM).
-- **Multi-Surface Architecture:** Use the native `ratatui` TUI, headless one-shot CLI (`saint-harness run`), HTTP/UDS + SSE daemon (`saint-harness serve`), or ACP JSON-RPC 2.0 stdio bridge (`saint-harness acp`) for external IDEs.
+- **Multi-Surface Architecture:** Use the native Tauri v2 Desktop App (`saint-harness-desktop`), interactive `ratatui` TUI (`saint-harness`, with mouse + keyboard navigation and auto-started embedded daemon), headless one-shot CLI (`saint-harness run`), HTTP/UDS + SSE daemon (`saint-harness serve`), or ACP JSON-RPC 2.0 stdio bridge (`saint-harness acp`) for external IDEs.
 
 ---
 
 ## Interface Walkthrough
+
+### Native Desktop App (Dark & Light Themes, Graphical API Keys, Live Git Diff)
+
+Launch **SaintHarness** directly from your OS application launcher without opening a terminal. Configure provider keys in the built-in **API Keys** dialog (`~/.saint-harness/settings.json`, `chmod 0600`), pick any project folder via native OS dialogs, stream live tool traces, and inspect real `git diff` hunks side by side.
+
+| Graphical API Keys & Endpoint Verification | Live Light Workspace & Split Git Diff |
+| :---: | :---: |
+| ![SaintHarness desktop API Keys settings dialog](docs/images/desktop-settings-dark.png) | ![SaintHarness desktop Light theme with live diff drawer](docs/images/desktop-workspace-light.png) |
+
+### Interactive Terminal UI & Split Diff Drawer (Saint Dark)
+
+![SaintHarness interactive workspace in Saint Dark with expanded tool trace and Hashline split diff drawer](docs/images/tui-workspace-diff-dark.png)
 
 ### OS Sandbox Approval Card (Saint Dark)
 
@@ -51,7 +63,28 @@ Press `Ctrl+G` (or run `/board`) to monitor all daemon sessions grouped by atten
 
 All official release downloads are verified against `SHA256SUMS.txt` before installation.
 
-### macOS, Linux Debian (12/13), and Linux Ubuntu (22.04/24.04)
+### Native Desktop App (Linux, macOS, Windows)
+
+Download the native Tauri v2 installer for your platform from [GitHub Releases](https://github.com/Locotine/SaintHarness/releases/latest) (all installers are checksummed in `SHA256SUMS.txt`):
+
+- **Linux (Debian 12/13 & Ubuntu 22.04/24.04):**
+  ```bash
+  sudo apt-get install ./saint-harness-desktop_<version>_amd64.deb
+  ```
+- **macOS (Apple Silicon & Intel):** open `saint-harness-desktop_<version>_aarch64.dmg` (or `_x64.dmg`) and drag **SaintHarness** to `Applications`.
+- **Windows (x64):** run `saint-harness-desktop_<version>_x64-setup.exe` (or `saint-harness-desktop_<version>_x64.msi`).
+
+Build and install the Desktop App locally from source:
+
+```bash
+# Linux (requires libwebkit2gtk-4.1-dev, libayatana-appindicator3-dev, librsvg2-dev)
+make desktop-install   # Builds .deb, installs binary to ~/.local/bin and registers Desktop launcher
+
+# macOS (.dmg) or Windows (.exe / .msi)
+cd apps/desktop && npm install && npm run build
+```
+
+### CLI & TUI: macOS, Linux Debian (12/13), and Linux Ubuntu (22.04/24.04)
 
 Install the prebuilt native binary to `~/.local/bin/saint-harness` and automatically configure `PATH` for `zsh`, `bash`, `fish`, or `~/.profile`:
 
@@ -269,9 +302,13 @@ saint-harness tui --attach http://127.0.0.1:3774
 | `Ctrl+T` | Open Session DAG tree and branch fork modal |
 | `Ctrl+N` | Start a new idle session |
 | `Ctrl+Alt+S` | Open `/btw` ephemeral warm-cache sidechat (no history writes) |
-| `Alt+]` | Open cross-model handoff picker |
+| `Alt+M` / `Alt+]` | Open cross-model handoff picker |
+| `Alt+A` | Open runtime access popover (`Ask for approval` / `Auto mode` / `Bypass permissions`) |
+| `Alt+T` | Toggle Dark / Light theme |
+| `Shift+Tab` | Toggle `Build` / `Plan` mode |
 | `1`..`4` | Resolve active approval or question card (`1` Approve once, `2` Always allow, `3` Decline, `4` Cancel turn) |
 | `Esc` | Dismiss topmost popover, modal, or drawer |
+| `Ctrl+Q` / `Ctrl+C` | Exit TUI cleanly (or type `/quit`) |
 
 Inline composer triggers:
 
