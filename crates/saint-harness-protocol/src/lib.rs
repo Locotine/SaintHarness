@@ -232,9 +232,13 @@ pub struct PromptRequest {
     #[serde(default)]
     pub client_msg_id: Option<String>,
     #[serde(default)]
+    pub profile_override: Option<String>,
+    #[serde(default)]
     pub model_override: Option<String>,
     #[serde(default)]
     pub interaction_mode: Option<WireInteractionMode>,
+    #[serde(default)]
+    pub runtime_mode: Option<WireRuntimeMode>,
 }
 
 fn default_delivery() -> String {

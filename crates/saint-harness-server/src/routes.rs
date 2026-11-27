@@ -405,25 +405,35 @@ async fn send_prompt(
     // Ring the Doorbell coordinator so the live AgentRunner processes this prompt and streams SSE events.
     let state_bg = state.clone();
     let sess_bg = id.clone();
+    let profile_ov = req.profile_override.clone();
     let model_ov = req.model_override.clone();
     let imode_ov = req.interaction_mode;
+    let rmode_ov = req.runtime_mode;
     state
         .coordinator
         .wake(id, WakeScope::DrainAll, move |_scope, cancel| {
             let st = state_bg.clone();
             let sid = sess_bg.clone();
+            let po = profile_ov.clone();
             let mo = model_ov.clone();
             async move {
-                let (rmode, stored_imode) = st
+                let (stored_rmode, stored_imode) = st
                     .session_modes
                     .get(&sid)
                     .map(|v| *v)
                     .unwrap_or((RuntimeMode::ApprovalRequired, InteractionMode::Build));
+                let rmode = match rmode_ov {
+                    Some(WireRuntimeMode::ApprovalRequired) => RuntimeMode::ApprovalRequired,
+                    Some(WireRuntimeMode::Auto) => RuntimeMode::Auto,
+                    Some(WireRuntimeMode::FullAccess) => RuntimeMode::FullAccess,
+                    None => stored_rmode,
+                };
                 let imode = match imode_ov {
                     Some(WireInteractionMode::Plan) => InteractionMode::Plan,
                     Some(WireInteractionMode::Build) => InteractionMode::Build,
                     None => stored_imode,
                 };
+                st.session_modes.insert(sid.clone(), (rmode, imode));
                 let sandbox = match rmode {
                     RuntimeMode::FullAccess => SandboxProfile::Disabled,
                     _ if imode == InteractionMode::Plan => SandboxProfile::ReadOnlyWorkspace,
@@ -431,11 +441,11 @@ async fn send_prompt(
                         extra_rw_dirs: Vec::new(),
                     },
                 };
-                let _ = st
+                if let Err(err) = st
                     .run_session_turn(
                         &sid,
                         crate::LiveTurnRequest {
-                            profile_override: None,
+                            profile_override: po,
                             model_override: mo,
                             edit_override: None,
                             runtime_mode: rmode,
@@ -446,7 +456,21 @@ async fn send_prompt(
                         },
                         cancel,
                     )
-                    .await;
+                    .await
+                {
+                    let _ = st
+                        .store
+                        .bus
+                        .publish_durable(
+                            SessionEvent::StepFailed {
+                                session_id: sid,
+                                step_num: 0,
+                                error: err,
+                            },
+                            None,
+                        )
+                        .await;
+                }
             }
         })
         .await;

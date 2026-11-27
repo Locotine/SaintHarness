@@ -246,8 +246,10 @@ mod tests {
                 text: "Verify WAL writer".into(),
                 delivery: "queue".into(),
                 client_msg_id: Some("cmsg_1".into()),
+                profile_override: None,
                 model_override: None,
                 interaction_mode: None,
+                runtime_mode: None,
             })
             .send()
             .await

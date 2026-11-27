@@ -13,6 +13,10 @@ pub enum DaemonAction {
         session_id: String,
         text: String,
         delivery: String,
+        profile_override: Option<String>,
+        model_override: Option<String>,
+        interaction_mode: Option<WireInteractionMode>,
+        runtime_mode: Option<WireRuntimeMode>,
     },
     ReplyPermission {
         request_id: String,
@@ -21,6 +25,25 @@ pub enum DaemonAction {
     Interrupt {
         session_id: String,
     },
+    CreateSession {
+        title: String,
+        model_profile: String,
+    },
+    SendBtw {
+        session_id: String,
+        question: String,
+    },
+    ForkSession {
+        session_id: String,
+        through_msg_id: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ModelPickerRow {
+    Leaf(String),
+    Provider(String),
+    Child { provider: String, key: String },
 }
 
 pub const SLASH_COMMANDS: [(&str, &str); 11] = [
@@ -156,6 +179,14 @@ pub struct TuiApp {
     pub sandbox_details_open: bool,
     pub steer_banner: Option<String>,
     pub composer_input: String,
+    pub composer_cursor: usize,
+    pub transcript_scroll: u16,
+    pub model_picker_idx: usize,
+    pub access_popover_idx: usize,
+    pub board_selected_idx: usize,
+    pub tree_selected_idx: usize,
+    pub default_model_profile: String,
+    pub workspace_label: String,
     pub inline_palette_open: bool,
     pub inline_palette_trigger: Option<char>,
     pub inline_palette_items: Vec<PaletteOption>,
@@ -214,6 +245,14 @@ impl TuiApp {
             sandbox_details_open: false,
             steer_banner: None,
             composer_input: String::new(),
+            composer_cursor: 0,
+            transcript_scroll: 0,
+            model_picker_idx: 0,
+            access_popover_idx: 0,
+            board_selected_idx: 0,
+            tree_selected_idx: 0,
+            default_model_profile: "qwen-3.8-27b".to_string(),
+            workspace_label: "SaintHarness".to_string(),
             inline_palette_open: false,
             inline_palette_trigger: None,
             inline_palette_items: Vec::new(),
@@ -271,6 +310,95 @@ impl TuiApp {
         self.active_session_id = id.to_string();
         self.board_open = false;
         self.sandbox_details_open = false;
+        self.transcript_scroll = 0;
+    }
+
+    pub fn ordered_session_ids(&self) -> Vec<String> {
+        self.grouped_sessions()
+            .into_iter()
+            .flat_map(|(_, items)| items.into_iter().map(|s| s.id.clone()))
+            .collect()
+    }
+
+    pub fn select_adjacent_session(&mut self, delta: isize) {
+        let ids = self.ordered_session_ids();
+        if ids.is_empty() {
+            return;
+        }
+        let cur = ids
+            .iter()
+            .position(|id| id == &self.active_session_id)
+            .unwrap_or(0);
+        let next = ((cur as isize) + delta).rem_euclid(ids.len() as isize) as usize;
+        self.select_session(&ids[next]);
+    }
+
+    pub fn request_new_session(&mut self) {
+        self.board_open = false;
+        self.model_popover_open = false;
+        self.access_popover_open = false;
+        self.cache_popover_open = false;
+        self.tree_modal_open = false;
+        self.btw_open = false;
+        self.focus = FocusTarget::Composer;
+        if self.live_connected {
+            self.pending_actions.push(DaemonAction::CreateSession {
+                title: "new session".to_string(),
+                model_profile: self.default_model_profile.clone(),
+            });
+        } else if self.sessions.iter().any(|s| s.id == "idle-new") {
+            self.select_session("idle-new");
+        } else {
+            let new_id = format!("session-{}", self.sessions.len() + 1);
+            self.sessions.push(SessionSummaryDto {
+                id: new_id.clone(),
+                name: "new session".into(),
+                status: SessionUiStatus::Idle,
+                model_profile: self.default_model_profile.clone(),
+                model_label: profile_display_label(&self.default_model_profile),
+                model_key: profile_model_key(&self.default_model_profile),
+                ctx_label: "0 / 110K".into(),
+                diff: None,
+                subtitle: "main".into(),
+                cache_warm: false,
+                cache_label: "Cold · 0%".into(),
+                cache_ttl_secs: 0,
+                cache_ttl_max_secs: 300,
+                cache_hit_pct: 0.0,
+                prune_epoch: 0,
+                queued_masks: 0,
+                cost_usd: 0.0,
+                runtime_mode: WireRuntimeMode::ApprovalRequired,
+                interaction_mode: WireInteractionMode::Build,
+                decision: None,
+                messages: Vec::new(),
+            });
+            self.select_session(&new_id);
+        }
+    }
+
+    pub fn scroll_transcript_up(&mut self, lines: u16) {
+        self.transcript_scroll = self.transcript_scroll.saturating_add(lines).min(2000);
+    }
+
+    pub fn scroll_transcript_down(&mut self, lines: u16) {
+        self.transcript_scroll = self.transcript_scroll.saturating_sub(lines);
+    }
+
+    pub fn cycle_cli_tab(&mut self) {
+        self.cli_tab = match self.cli_tab {
+            CliTab::Status => CliTab::Eval,
+            CliTab::Eval => CliTab::Models,
+            CliTab::Models => CliTab::Status,
+        };
+    }
+
+    pub fn toggle_sandbox_details(&mut self) {
+        self.sandbox_details_open = !self.sandbox_details_open;
+    }
+
+    pub fn toggle_diff_hashline(&mut self) {
+        self.diff_show_hashline = !self.diff_show_hashline;
     }
 
     pub fn grouped_sessions(&self) -> Vec<(SessionUiStatus, Vec<&SessionSummaryDto>)> {
@@ -324,6 +452,13 @@ impl TuiApp {
 
     pub fn toggle_board(&mut self) {
         self.board_open = !self.board_open;
+        if self.board_open {
+            let ids = self.board_session_ids();
+            self.board_selected_idx = ids
+                .iter()
+                .position(|id| id == &self.active_session_id)
+                .unwrap_or(0);
+        }
     }
 
     pub fn open_model_popover(&mut self) {
@@ -331,6 +466,21 @@ impl TuiApp {
         self.cache_popover_open = false;
         self.access_popover_open = false;
         self.model_popover_open = !self.model_popover_open;
+        if self.model_popover_open {
+            let cur = self
+                .current_session()
+                .map(|s| s.model_key.clone())
+                .unwrap_or_default();
+            let rows = self.model_picker_rows();
+            self.model_picker_idx = rows
+                .iter()
+                .position(|r| match r {
+                    ModelPickerRow::Leaf(k) => k == &cur,
+                    ModelPickerRow::Child { key, .. } => key == &cur,
+                    ModelPickerRow::Provider(_) => false,
+                })
+                .unwrap_or(0);
+        }
     }
 
     pub fn open_cache_popover(&mut self) {
@@ -345,6 +495,17 @@ impl TuiApp {
         self.model_popover_open = false;
         self.cache_popover_open = false;
         self.access_popover_open = !self.access_popover_open;
+        if self.access_popover_open {
+            let cur = self
+                .current_session()
+                .map(|s| s.runtime_mode)
+                .unwrap_or_default();
+            self.access_popover_idx = match cur {
+                WireRuntimeMode::ApprovalRequired => 0,
+                WireRuntimeMode::Auto => 1,
+                WireRuntimeMode::FullAccess => 2,
+            };
+        }
     }
 
     pub fn open_btw(&mut self) {
@@ -355,6 +516,11 @@ impl TuiApp {
     pub fn open_tree_modal(&mut self) {
         self.last_focus_before_overlay = FocusTarget::Composer;
         self.tree_modal_open = true;
+        self.tree_selected_idx = self
+            .tree_nodes
+            .iter()
+            .position(|n| n.id == self.tree_head_id)
+            .unwrap_or(0);
     }
 
     pub fn toggle_latest_worked_for(&mut self) {
@@ -498,7 +664,85 @@ impl TuiApp {
 
     pub fn set_composer_input(&mut self, text: String) {
         self.composer_input = text;
+        self.composer_cursor = self.composer_input.len();
         self.refresh_inline_palette();
+    }
+
+    pub fn insert_composer_char(&mut self, c: char) {
+        let idx = self.composer_cursor.min(self.composer_input.len());
+        let safe_idx = clamp_char_boundary(&self.composer_input, idx);
+        self.composer_input.insert(safe_idx, c);
+        self.composer_cursor = safe_idx + c.len_utf8();
+        self.refresh_inline_palette();
+    }
+
+    pub fn backspace_composer(&mut self) {
+        let idx = clamp_char_boundary(&self.composer_input, self.composer_cursor);
+        if idx == 0 {
+            return;
+        }
+        if let Some((prev_idx, _)) = self.composer_input[..idx].char_indices().next_back() {
+            self.composer_input.remove(prev_idx);
+            self.composer_cursor = prev_idx;
+            self.refresh_inline_palette();
+        }
+    }
+
+    pub fn delete_composer(&mut self) {
+        let idx = clamp_char_boundary(&self.composer_input, self.composer_cursor);
+        if idx < self.composer_input.len() {
+            self.composer_input.remove(idx);
+            self.refresh_inline_palette();
+        }
+    }
+
+    pub fn move_composer_left(&mut self) {
+        let idx = clamp_char_boundary(&self.composer_input, self.composer_cursor);
+        if let Some((prev_idx, _)) = self.composer_input[..idx].char_indices().next_back() {
+            self.composer_cursor = prev_idx;
+        }
+    }
+
+    pub fn move_composer_right(&mut self) {
+        let idx = clamp_char_boundary(&self.composer_input, self.composer_cursor);
+        if let Some(ch) = self.composer_input[idx..].chars().next() {
+            self.composer_cursor = idx + ch.len_utf8();
+        }
+    }
+
+    pub fn move_composer_home(&mut self) {
+        self.composer_cursor = 0;
+    }
+
+    pub fn move_composer_end(&mut self) {
+        self.composer_cursor = self.composer_input.len();
+    }
+
+    pub fn clear_composer(&mut self) {
+        self.composer_input.clear();
+        self.composer_cursor = 0;
+        self.refresh_inline_palette();
+    }
+
+    pub fn accept_inline_palette_selection(&mut self) -> bool {
+        if !self.inline_palette_open {
+            return false;
+        }
+        let Some(chosen) = self
+            .inline_palette_items
+            .get(self.inline_palette_idx)
+            .cloned()
+        else {
+            return false;
+        };
+        self.inline_palette_open = false;
+        if let Some(insert) = chosen.insert_text {
+            self.set_composer_input(insert);
+            return true;
+        }
+        self.clear_composer();
+        self.execute_slash_command(&chosen.key);
+        true
     }
 
     pub fn refresh_inline_palette(&mut self) {
@@ -588,19 +832,7 @@ impl TuiApp {
     }
 
     pub fn submit_composer(&mut self) {
-        if self.inline_palette_open
-            && let Some(chosen) = self
-                .inline_palette_items
-                .get(self.inline_palette_idx)
-                .cloned()
-        {
-            self.inline_palette_open = false;
-            if let Some(insert) = chosen.insert_text {
-                self.composer_input = insert;
-                return;
-            }
-            self.composer_input.clear();
-            self.execute_slash_command(&chosen.key);
+        if self.accept_inline_palette_selection() {
             return;
         }
 
@@ -610,6 +842,8 @@ impl TuiApp {
         }
         self.inline_palette_open = false;
         self.composer_input.clear();
+        self.composer_cursor = 0;
+        self.transcript_scroll = 0;
 
         if text.starts_with('/') {
             let cmd = text.split_whitespace().next().unwrap_or("");
@@ -621,6 +855,17 @@ impl TuiApp {
         let is_working = self
             .current_session()
             .is_some_and(|s| s.status == SessionUiStatus::Working);
+        let cur_profile_ov = self.current_session().map(|s| s.model_profile.clone());
+        let cur_imode = self.current_session().map(|s| s.interaction_mode);
+        let cur_rmode = self.current_session().map(|s| s.runtime_mode);
+        let cur_model_ov = self.current_session().and_then(|s| {
+            let k = s.model_key.as_str();
+            if k.starts_with("claude-") && k != "claude" {
+                Some(k.to_string())
+            } else {
+                None
+            }
+        });
         if is_working {
             self.steer_banner = Some(format!(
                 "Steer queued: \"{text}\". Sent after the current tool finishes."
@@ -631,6 +876,10 @@ impl TuiApp {
                     session_id: sid,
                     text,
                     delivery: "steer".to_string(),
+                    profile_override: cur_profile_ov,
+                    model_override: cur_model_ov,
+                    interaction_mode: cur_imode,
+                    runtime_mode: cur_rmode,
                 });
             }
             return;
@@ -687,6 +936,10 @@ impl TuiApp {
                 session_id: sid,
                 text,
                 delivery: "queue".to_string(),
+                profile_override: cur_profile_ov,
+                model_override: cur_model_ov,
+                interaction_mode: cur_imode,
+                runtime_mode: cur_rmode,
             });
         }
     }
@@ -949,6 +1202,26 @@ impl TuiApp {
                 }
                 true
             }
+            "/new" => {
+                self.request_new_session();
+                true
+            }
+            "/theme" => {
+                self.toggle_theme();
+                true
+            }
+            "/help" => {
+                if let Some(sess) = self.current_session_mut() {
+                    sess.messages.push(TranscriptItemDto::Handoff {
+                        text: "Keys: Ctrl+B sidebar · Ctrl+D diff · Ctrl+G board · Ctrl+N new · Alt+M model · Alt+A access · Alt+T theme · Alt+Up/Down switch session · Shift+Tab Build/Plan · Ctrl+Q/C quit".to_string(),
+                    });
+                }
+                true
+            }
+            "/quit" | "/exit" => {
+                self.should_quit = true;
+                true
+            }
             _ => false,
         }
     }
@@ -988,7 +1261,13 @@ impl TuiApp {
 
     pub fn select_model_key(&mut self, key: &str) -> bool {
         if let Some(leaf) = self.model_leaves.iter().find(|l| l.key == key).cloned() {
+            let profile_name = if leaf.key == "qwen4" {
+                "qwen-4-upcoming"
+            } else {
+                "qwen-3.8-27b"
+            };
             if let Some(sess) = self.current_session_mut() {
+                sess.model_profile = profile_name.to_string();
                 sess.model_label = leaf.name;
                 sess.model_key = leaf.key;
                 if !sess.messages.is_empty() {
@@ -1003,11 +1282,17 @@ impl TuiApp {
         }
         for prov in &self.model_providers {
             if let Some(child) = prov.children.iter().find(|c| c.key == key).cloned() {
+                let profile_name = if prov.key == "gemini" {
+                    "gemini-flagship"
+                } else {
+                    "claude-flagship"
+                };
                 let note = format!(
                     "Handoff to {} ({}) · {}",
                     child.name, child.selector, prov.handoff_suffix
                 );
                 if let Some(sess) = self.current_session_mut() {
+                    sess.model_profile = profile_name.to_string();
                     sess.model_label = child.name;
                     sess.model_key = child.key;
                     if !sess.messages.is_empty() {
@@ -1021,6 +1306,196 @@ impl TuiApp {
             }
         }
         false
+    }
+
+    pub fn model_picker_rows(&self) -> Vec<ModelPickerRow> {
+        let mut rows = Vec::new();
+        for leaf in &self.model_leaves {
+            rows.push(ModelPickerRow::Leaf(leaf.key.clone()));
+        }
+        for prov in &self.model_providers {
+            rows.push(ModelPickerRow::Provider(prov.key.clone()));
+            if self.expanded_providers.contains(&prov.key) {
+                let st = self
+                    .provider_catalog_state
+                    .get(&prov.key)
+                    .copied()
+                    .unwrap_or(CatalogLoadState::Loaded);
+                if matches!(st, CatalogLoadState::Loaded | CatalogLoadState::Idle) {
+                    for child in &prov.children {
+                        rows.push(ModelPickerRow::Child {
+                            provider: prov.key.clone(),
+                            key: child.key.clone(),
+                        });
+                    }
+                }
+            }
+        }
+        rows
+    }
+
+    pub fn model_picker_move(&mut self, delta: isize) {
+        let rows = self.model_picker_rows();
+        if rows.is_empty() {
+            return;
+        }
+        let cur = self.model_picker_idx.min(rows.len().saturating_sub(1));
+        self.model_picker_idx = ((cur as isize) + delta).rem_euclid(rows.len() as isize) as usize;
+    }
+
+    pub fn model_picker_activate(&mut self) {
+        let rows = self.model_picker_rows();
+        let Some(row) = rows.get(self.model_picker_idx).cloned() else {
+            return;
+        };
+        match row {
+            ModelPickerRow::Leaf(key) | ModelPickerRow::Child { key, .. } => {
+                self.select_model_key(&key);
+            }
+            ModelPickerRow::Provider(prov_key) => {
+                let was_open = self.expanded_providers.contains(&prov_key);
+                self.toggle_provider_expand(&prov_key);
+                if !was_open && self.daemon_state == DaemonConnectionState::Ok {
+                    self.finish_provider_catalog_load(&prov_key, true);
+                }
+            }
+        }
+    }
+
+    pub fn model_picker_collapse_current(&mut self) {
+        let rows = self.model_picker_rows();
+        let Some(row) = rows.get(self.model_picker_idx).cloned() else {
+            return;
+        };
+        match row {
+            ModelPickerRow::Provider(prov_key) => {
+                self.expanded_providers.remove(&prov_key);
+            }
+            ModelPickerRow::Child { provider, .. } => {
+                self.expanded_providers.remove(&provider);
+                let new_rows = self.model_picker_rows();
+                if let Some(pos) = new_rows
+                    .iter()
+                    .position(|r| matches!(r, ModelPickerRow::Provider(p) if p == &provider))
+                {
+                    self.model_picker_idx = pos;
+                }
+            }
+            ModelPickerRow::Leaf(_) => {}
+        }
+    }
+
+    pub fn access_popover_move(&mut self, delta: isize) {
+        self.access_popover_idx =
+            ((self.access_popover_idx as isize) + delta).rem_euclid(3) as usize;
+    }
+
+    pub fn access_popover_activate(&mut self) {
+        let mode = match self.access_popover_idx {
+            1 => WireRuntimeMode::Auto,
+            2 => WireRuntimeMode::FullAccess,
+            _ => WireRuntimeMode::ApprovalRequired,
+        };
+        self.set_runtime_mode(mode);
+    }
+
+    pub fn board_session_ids(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        for pred in [
+            (|s: &SessionSummaryDto| s.status == SessionUiStatus::Blocked)
+                as fn(&SessionSummaryDto) -> bool,
+            |s: &SessionSummaryDto| s.status == SessionUiStatus::Working,
+            |s: &SessionSummaryDto| {
+                matches!(s.status, SessionUiStatus::Done | SessionUiStatus::Idle)
+            },
+        ] {
+            for s in self.sessions.iter().filter(|s| pred(s)) {
+                out.push(s.id.clone());
+            }
+        }
+        out
+    }
+
+    pub fn board_move(&mut self, delta: isize) {
+        let ids = self.board_session_ids();
+        if ids.is_empty() {
+            return;
+        }
+        let cur = self.board_selected_idx.min(ids.len().saturating_sub(1));
+        self.board_selected_idx = ((cur as isize) + delta).rem_euclid(ids.len() as isize) as usize;
+    }
+
+    pub fn board_activate(&mut self) {
+        let ids = self.board_session_ids();
+        if let Some(id) = ids.get(self.board_selected_idx).cloned() {
+            self.select_session(&id);
+        } else {
+            self.board_open = false;
+        }
+        self.focus = FocusTarget::Composer;
+    }
+
+    pub fn tree_move(&mut self, delta: isize) {
+        if self.tree_nodes.is_empty() {
+            return;
+        }
+        let cur = self.tree_selected_idx.min(self.tree_nodes.len() - 1);
+        self.tree_selected_idx =
+            ((cur as isize) + delta).rem_euclid(self.tree_nodes.len() as isize) as usize;
+    }
+
+    pub fn tree_activate(&mut self) {
+        if let Some(node) = self.tree_nodes.get(self.tree_selected_idx) {
+            self.tree_head_id = node.id.clone();
+        }
+        self.tree_modal_open = false;
+        self.focus = FocusTarget::Composer;
+    }
+
+    pub fn tree_fork_head(&mut self) {
+        let head = self.tree_head_id.clone();
+        if self.live_connected {
+            self.pending_actions.push(DaemonAction::ForkSession {
+                session_id: self.active_session_id.clone(),
+                through_msg_id: Some(head),
+            });
+            self.tree_modal_open = false;
+        } else {
+            let new_id = format!("msg_fork_{}", self.tree_nodes.len() + 1);
+            self.tree_nodes.push(TreeBranchEntry {
+                id: new_id.clone(),
+                prefix: "└─ ".into(),
+                label: format!("Forked from {head}"),
+            });
+            self.tree_head_id = new_id;
+            self.tree_selected_idx = self.tree_nodes.len().saturating_sub(1);
+        }
+    }
+
+    pub fn btw_push_char(&mut self, c: char) {
+        self.btw_input.push(c);
+    }
+
+    pub fn btw_backspace(&mut self) {
+        self.btw_input.pop();
+    }
+
+    pub fn btw_submit(&mut self) {
+        let q = self.btw_input.trim().to_string();
+        if q.is_empty() {
+            return;
+        }
+        self.btw_input.clear();
+        if self.live_connected {
+            self.btw_output = format!("Asking on warm cache: \"{q}\"…");
+            self.pending_actions.push(DaemonAction::SendBtw {
+                session_id: self.active_session_id.clone(),
+                question: q,
+            });
+        } else {
+            self.btw_output =
+                format!("Side answer (ephemeral, not saved to history): received \"{q}\".");
+        }
     }
 
     /// Closes ONLY the top-most open layer and restores focus to its trigger (contract invariant).
@@ -1070,7 +1545,40 @@ impl TuiApp {
             self.focus = FocusTarget::Composer;
             return true;
         }
+        if self.cli_drawer_open {
+            self.cli_drawer_open = false;
+            self.focus = FocusTarget::Composer;
+            return true;
+        }
         false
+    }
+}
+
+fn clamp_char_boundary(s: &str, mut idx: usize) -> usize {
+    idx = idx.min(s.len());
+    while idx > 0 && !s.is_char_boundary(idx) {
+        idx -= 1;
+    }
+    idx
+}
+
+pub fn profile_display_label(profile: &str) -> String {
+    match profile {
+        "qwen-3.8-27b" => "Qwen 3.8".to_string(),
+        "qwen-4-upcoming" => "Qwen 4".to_string(),
+        "claude-flagship" => "Claude Flagship".to_string(),
+        "gemini-flagship" => "Gemini Flagship".to_string(),
+        other => other.to_string(),
+    }
+}
+
+pub fn profile_model_key(profile: &str) -> String {
+    match profile {
+        "qwen-3.8-27b" => "qwen".to_string(),
+        "qwen-4-upcoming" => "qwen4".to_string(),
+        "claude-flagship" => "claude".to_string(),
+        "gemini-flagship" => "gemini".to_string(),
+        other => other.to_string(),
     }
 }
 

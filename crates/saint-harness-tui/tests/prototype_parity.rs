@@ -527,3 +527,125 @@ fn parity_live_sse_streaming_and_daemon_action_dispatch() {
     assert!(rendered.contains("+7-2"));
     assert!(rendered.contains("Warm · 80%"));
 }
+
+#[test]
+fn interactive_keyboard_and_mouse_navigation_across_all_views() {
+    use crossterm::event::{KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
+    use saint_harness_protocol::WireInteractionMode;
+    use saint_harness_tui::{handle_key, handle_mouse, view::UiHitMap};
+
+    let mut app = TuiApp::new(ThemeMode::SaintDark, 140, 42, false);
+
+    // 1. Composer cursor left/right editing
+    handle_key(&mut app, KeyCode::Char('h'), KeyModifiers::NONE, 140);
+    handle_key(&mut app, KeyCode::Char('i'), KeyModifiers::NONE, 140);
+    handle_key(&mut app, KeyCode::Left, KeyModifiers::NONE, 140);
+    handle_key(&mut app, KeyCode::Char('!'), KeyModifiers::NONE, 140);
+    assert_eq!(app.composer_input, "h!i");
+    handle_key(&mut app, KeyCode::Char('u'), KeyModifiers::CONTROL, 140);
+    assert!(app.composer_input.is_empty());
+
+    // 2. Model Picker keyboard navigation (Alt+] -> expand Claude -> pick Auto)
+    handle_key(&mut app, KeyCode::Char(']'), KeyModifiers::ALT, 140);
+    assert!(app.model_popover_open);
+    handle_key(&mut app, KeyCode::Down, KeyModifiers::NONE, 140); // qwen4
+    handle_key(&mut app, KeyCode::Down, KeyModifiers::NONE, 140); // Claude provider
+    handle_key(&mut app, KeyCode::Enter, KeyModifiers::NONE, 140); // expands & loads Claude
+    assert!(app.expanded_providers.contains("claude"));
+    handle_key(&mut app, KeyCode::Down, KeyModifiers::NONE, 140); // Claude Auto
+    handle_key(&mut app, KeyCode::Enter, KeyModifiers::NONE, 140); // selects Claude Flagship
+    assert!(!app.model_popover_open);
+    assert_eq!(
+        app.current_session().unwrap().model_label,
+        "Claude Flagship"
+    );
+
+    // 3. Access mode popover keyboard navigation (Alt+A -> Down -> Enter => Auto mode)
+    handle_key(&mut app, KeyCode::Char('a'), KeyModifiers::ALT, 140);
+    assert!(app.access_popover_open);
+    handle_key(&mut app, KeyCode::Down, KeyModifiers::NONE, 140);
+    handle_key(&mut app, KeyCode::Enter, KeyModifiers::NONE, 140);
+    assert!(!app.access_popover_open);
+    assert_eq!(
+        app.current_session().unwrap().runtime_mode,
+        WireRuntimeMode::Auto
+    );
+
+    // 4. /btw sidechat captures typing separately from composer
+    handle_key(
+        &mut app,
+        KeyCode::Char('s'),
+        KeyModifiers::CONTROL | KeyModifiers::ALT,
+        140,
+    );
+    assert!(app.btw_open);
+    handle_key(&mut app, KeyCode::Char('w'), KeyModifiers::NONE, 140);
+    handle_key(&mut app, KeyCode::Char('a'), KeyModifiers::NONE, 140);
+    handle_key(&mut app, KeyCode::Char('l'), KeyModifiers::NONE, 140);
+    assert_eq!(app.btw_input, "wal");
+    assert!(app.composer_input.is_empty());
+    handle_key(&mut app, KeyCode::Enter, KeyModifiers::NONE, 140);
+    assert!(app.btw_output.contains("wal"));
+    handle_key(&mut app, KeyCode::Esc, KeyModifiers::NONE, 140);
+    assert!(!app.btw_open);
+
+    // 5. Agent Board keyboard selection (Ctrl+G -> Down -> Enter)
+    let before = app.active_session_id.clone();
+    handle_key(&mut app, KeyCode::Char('g'), KeyModifiers::CONTROL, 140);
+    assert!(app.board_open);
+    handle_key(&mut app, KeyCode::Down, KeyModifiers::NONE, 140);
+    handle_key(&mut app, KeyCode::Enter, KeyModifiers::NONE, 140);
+    assert!(!app.board_open);
+    assert_ne!(app.active_session_id, before);
+
+    // 6. Mouse hit-testing via render_with_hitmap
+    let backend = TestBackend::new(140, 42);
+    let mut terminal = Terminal::new(backend).unwrap();
+    let mut hitmap = UiHitMap::default();
+    terminal
+        .draw(|f| view::render_with_hitmap(f, &app, &mut hitmap))
+        .unwrap();
+
+    // Click Build/Plan toggle in composer footer
+    let mode_rect = hitmap.composer_mode_btn.unwrap();
+    handle_mouse(
+        &mut app,
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: mode_rect.x + 1,
+            row: mode_rect.y,
+            modifiers: KeyModifiers::NONE,
+        },
+        &hitmap,
+        140,
+    );
+    assert_eq!(
+        app.current_session().unwrap().interaction_mode,
+        WireInteractionMode::Plan
+    );
+
+    // Click another session row in sidebar
+    let (sb_rect, sb_id) = hitmap
+        .sidebar_sessions
+        .iter()
+        .find(|(_, id)| id != &app.active_session_id)
+        .unwrap()
+        .clone();
+    handle_mouse(
+        &mut app,
+        MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: sb_rect.x + 1,
+            row: sb_rect.y,
+            modifiers: KeyModifiers::NONE,
+        },
+        &hitmap,
+        140,
+    );
+    assert_eq!(app.active_session_id, sb_id);
+
+    // /quit exits cleanly
+    app.set_composer_input("/quit".into());
+    handle_key(&mut app, KeyCode::Enter, KeyModifiers::NONE, 140);
+    assert!(app.should_quit);
+}

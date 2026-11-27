@@ -5,7 +5,7 @@ use saint_harness_core::{
 };
 use saint_harness_schema::{
     InteractionMode, PermissionPolicy, RuntimeMode, SandboxProfile, Tool, ToolContext,
-    embedded_profile, load_routes_with_overrides,
+    embedded_profile, load_routes_with_overrides, resolve_env_value,
 };
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -134,6 +134,17 @@ impl AppState {
             .get(&profile.model.route)
             .cloned()
             .ok_or_else(|| format!("unknown route `{}`", profile.model.route))?;
+        let is_local_route =
+            route.base_url.contains("127.0.0.1") || route.base_url.contains("localhost");
+        if !is_local_route
+            && resolve_env_value(&route.api_key_env, Some(&ws), opts.settings_home.as_deref())
+                .is_none()
+        {
+            return Err(format!(
+                "missing API key `{}` for route `{}` ({}). Run `saint-harness auth login` to save it in ~/.saint-harness/settings.json.",
+                route.api_key_env, profile.model.route, route.base_url
+            ));
+        }
         let protocol = self
             .protocols
             .get(&route.protocol)

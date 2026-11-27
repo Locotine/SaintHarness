@@ -216,7 +216,7 @@ async fn main() -> ExitCode {
     let res = match command {
         None => {
             if io::stdout().is_terminal() && io::stdin().is_terminal() {
-                run_tui_cmd(None, None, &cli.theme, no_color, cli.no_motion).await
+                run_tui_cmd(&cli, None, None, &cli.theme, no_color, cli.no_motion).await
             } else {
                 let mut buf = String::new();
                 let _ = io::stdin().read_to_string(&mut buf);
@@ -235,7 +235,7 @@ async fn main() -> ExitCode {
             }
         }
         Some(Commands::Tui { attach, session }) => {
-            run_tui_cmd(attach, session, &cli.theme, no_color, cli.no_motion).await
+            run_tui_cmd(&cli, attach, session, &cli.theme, no_color, cli.no_motion).await
         }
         Some(Commands::Auth { action }) => run_auth_cmd(action, cli.home_dir.as_deref(), cli.json)
             .await
@@ -366,6 +366,7 @@ impl CliErr {
 }
 
 async fn run_tui_cmd(
+    cli: &Cli,
     attach: Option<String>,
     session: Option<String>,
     theme: &str,
@@ -379,18 +380,94 @@ async fn run_tui_cmd(
         } else {
             saint_harness_tui::ThemeMode::parse(theme)
         };
-        saint_harness_tui::run_tui(saint_harness_tui::TuiLaunchOptions {
-            attach_url: attach,
+        let cwd_str = std::env::current_dir()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|_| ".".to_string());
+
+        #[cfg(feature = "embedded-server")]
+        let default_profile = {
+            let cwd_path = std::env::current_dir().ok();
+            let eff = load_effective_settings(cwd_path.as_deref(), cli.home_dir.as_deref());
+            cli.profile
+                .clone()
+                .or(eff.default_profile)
+                .unwrap_or_else(|| "qwen-3.8-27b".to_string())
+        };
+        #[cfg(not(feature = "embedded-server"))]
+        let default_profile = cli
+            .profile
+            .clone()
+            .unwrap_or_else(|| "qwen-3.8-27b".to_string());
+
+        // When invoked without --attach, connect to an existing local daemon on :3774 or
+        // automatically start an ephemeral in-process server so `saint-harness` works out-of-the-box.
+        let (resolved_attach, embedded_handle): (
+            Option<String>,
+            Option<tokio::task::JoinHandle<Result<(), String>>>,
+        ) = match attach {
+            Some(url) => (Some(url), None),
+            None => {
+                #[cfg(feature = "embedded-server")]
+                {
+                    let probe = reqwest::Client::new()
+                        .get("http://127.0.0.1:3774/health")
+                        .timeout(Duration::from_millis(200))
+                        .send()
+                        .await;
+                    if matches!(probe, Ok(resp) if resp.status().is_success()) {
+                        (Some("http://127.0.0.1:3774".to_string()), None)
+                    } else {
+                        let cwd =
+                            std::env::current_dir().map_err(|e| CliErr::runtime(e.to_string()))?;
+                        let data_dir = resolve_data_dir(cli.home_dir.as_deref());
+                        let state = saint_harness_server::AppState::bootstrap(
+                            cwd,
+                            home_dir(),
+                            data_dir,
+                            "http://127.0.0.1:0".to_string(),
+                            None,
+                            false,
+                        )
+                        .await
+                        .map_err(CliErr::runtime)?;
+                        let addr: std::net::SocketAddr =
+                            "127.0.0.1:0"
+                                .parse()
+                                .map_err(|e: std::net::AddrParseError| {
+                                    CliErr::runtime(e.to_string())
+                                })?;
+                        let (bound, handle) = saint_harness_server::serve_tcp(addr, state, None)
+                            .await
+                            .map_err(CliErr::runtime)?;
+                        (Some(format!("http://{bound}")), Some(handle))
+                    }
+                }
+                #[cfg(not(feature = "embedded-server"))]
+                {
+                    (None, None)
+                }
+            }
+        };
+
+        let res = saint_harness_tui::run_tui(saint_harness_tui::TuiLaunchOptions {
+            attach_url: resolved_attach,
             session_id: session,
             theme_mode,
             reduced_motion: no_motion,
+            default_profile,
+            workspace_cwd: cwd_str,
         })
         .await
-        .map_err(CliErr::runtime)
+        .map_err(CliErr::runtime);
+
+        if let Some(handle) = embedded_handle {
+            handle.abort();
+        }
+        res
     }
     #[cfg(not(feature = "tui"))]
     {
-        let _ = (attach, session, theme, no_color, no_motion);
+        let _ = (cli, attach, session, theme, no_color, no_motion);
         Err(CliErr::runtime("tui feature is disabled in this build"))
     }
 }
