@@ -190,10 +190,12 @@ jobs:
           if ($models -notmatch '"hardcodedProviderVersions": 0') {
             throw "Unexpected models --json output: $models"
           }
+          $PSNativeCommandUseErrorActionPreference = $false
           & $bin server status --url http://127.0.0.1:1 --json | Out-Null
           if ($LASTEXITCODE -ne 1) {
             throw "Expected exit code 1 for offline server status, got $LASTEXITCODE"
           }
+          exit 0
 
       - name: Package Linux tarball and verified Debian/Ubuntu .deb
         if: matrix.platform == 'linux'
