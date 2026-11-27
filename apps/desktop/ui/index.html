@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SaintHarness</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <!-- Top quiet-chrome bar -->
+    <header class="topbar" role="banner">
+      <div class="topbar-left">
+        <button type="button" id="btn-sidebar" class="tb-btn" aria-label="Toggle session sidebar" aria-expanded="true" title="Toggle sidebar (Ctrl+B)">
+          <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <rect x="1.5" y="2.5" width="13" height="11" rx="2" stroke="currentColor" stroke-width="1.3"/>
+            <line x1="5.75" y1="2.5" x2="5.75" y2="13.5" stroke="currentColor" stroke-width="1.3"/>
+          </svg>
+        </button>
+
+        <div class="crumb" id="hdr-crumb">
+          <span id="hdr-status-dot" class="status-dot idle" aria-hidden="true"></span>
+          <span id="hdr-session-name" class="crumb-title">Loading workspace...</span>
+          <span class="crumb-sep" aria-hidden="true">/</span>
+          <button type="button" id="btn-workspace" class="tb-btn workspace-pill" title="Open workspace folder">
+            <span id="hdr-workspace-name">Workspace</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <button type="button" id="btn-cache" class="tb-btn mono" aria-haspopup="dialog" aria-expanded="false" title="Cache and session cost">
+          <span id="hdr-cache-dot" class="status-dot idle" aria-hidden="true"></span>
+          <span id="hdr-cache-label">Cold · 0%</span>
+        </button>
+
+        <button type="button" id="btn-diff" class="tb-btn mono" aria-pressed="false" title="Toggle workspace diff drawer (Ctrl+D)">
+          <span id="hdr-diff-label">Diff</span>
+        </button>
+
+        <button type="button" id="btn-model" class="tb-btn" aria-haspopup="dialog" aria-expanded="false" title="Switch model (Alt+M)">
+          <span id="hdr-model-label">Qwen 3.8</span>
+          <span class="caret" aria-hidden="true">▾</span>
+        </button>
+
+        <button type="button" id="btn-settings" class="tb-btn" aria-haspopup="dialog" aria-expanded="false" title="API Keys and Providers (Ctrl+,)">
+          <span id="hdr-auth-dot" class="status-dot idle" aria-hidden="true"></span>
+          <span class="btn-text-hide-sm">API Keys</span>
+        </button>
+
+        <button type="button" id="btn-theme" class="tb-btn" aria-label="Switch color theme" title="Toggle Dark / Light theme (Alt+T)">
+          <span id="hdr-theme-label">Light</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main 3-pane workspace -->
+    <div class="workspace-body">
+      <div id="sidebar-scrim" class="scrim hidden" aria-hidden="true"></div>
+
+      <!-- Left session sidebar -->
+      <aside id="sidebar" class="sidebar" aria-label="Sessions and workspace">
+        <div class="sidebar-actions">
+          <button type="button" id="btn-new-session" class="side-primary-btn" title="New session (Ctrl+N)">
+            <span>+ New session</span>
+          </button>
+          <button type="button" id="btn-board" class="side-ghost-btn" aria-pressed="false" title="Agent Board (Ctrl+G)">
+            <span>Board</span>
+          </button>
+        </div>
+
+        <div class="sidebar-ws-row">
+          <button type="button" id="btn-sidebar-workspace" class="ws-picker-btn" title="Choose project directory">
+            <span class="ws-label-k">Folder</span>
+            <span id="sidebar-ws-path" class="ws-path mono">...</span>
+          </button>
+        </div>
+
+        <nav id="session-list" class="session-list" aria-label="Sessions">
+          <div class="sidebar-state-msg">Loading sessions...</div>
+        </nav>
+
+        <footer class="sidebar-footer">
+          <div class="daemon-status">
+            <span id="daemon-dot" class="status-dot idle" aria-hidden="true"></span>
+            <span id="daemon-label" class="mono">Starting engine...</span>
+          </div>
+          <span id="app-version" class="mono version-tag">v0.1.0</span>
+        </footer>
+      </aside>
+
+      <!-- Center conversation or Agent Board -->
+      <main id="main-stage" class="main-stage" role="main">
+        <!-- Agent Board view (toggled by Ctrl+G or Board button) -->
+        <section id="board-view" class="board-view hidden" aria-label="Agent Board">
+          <div class="board-header">
+            <div>
+              <h1 class="board-title">Agent Board</h1>
+              <p class="board-sub">Active sessions grouped by current state. Select any session to resume.</p>
+            </div>
+            <button type="button" id="btn-board-close" class="tb-btn">Back to session</button>
+          </div>
+          <div id="board-grid" class="board-grid"></div>
+        </section>
+
+        <!-- Session view (Landing when empty, Transcript when populated) -->
+        <section id="session-view" class="session-view" aria-label="Active session">
+          <div id="scroll-viewport" class="scroll-viewport">
+            <!-- Landing view (empty session) -->
+            <div id="landing-view" class="landing-view hidden">
+              <div class="landing-inner">
+                <svg class="saint-mark" width="56" height="56" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+                  <!-- Crown (Saint Ember accent) -->
+                  <path d="M18 17L23 8L32 14L41 8L46 17H18Z" fill="var(--accent)"/>
+                  <rect x="20" y="18.5" width="24" height="2.8" rx="1.4" fill="var(--accent)"/>
+                  <!-- Shield -->
+                  <path d="M14 25.5C14 24.4 14.9 23.5 16 23.5H48C49.1 23.5 50 24.4 50 25.5V36.8C50 47.4 41.8 54.4 32 58C22.2 54.4 14 47.4 14 36.8V25.5Z" stroke="currentColor" stroke-width="3" fill="none"/>
+                  <!-- S ribbon inside shield -->
+                  <path d="M38.5 31.5C38.5 29.4 36.2 28.2 32.3 28.2C28.2 28.2 25.6 29.9 25.6 32.3C25.6 34.8 28.1 35.9 32.2 36.7C36.4 37.5 39 38.8 39 41.7C39 44.5 36.1 46.5 31.6 46.5C27.5 46.5 24.8 44.9 24.4 42.3" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+                </svg>
+
+                <h1 class="landing-heading">Let's build</h1>
+                <p id="landing-workspace-meta" class="landing-sub mono">Workspace</p>
+
+                <!-- Honest API key notice shown only when no cloud key is saved -->
+                <div id="landing-auth-banner" class="auth-callout hidden" role="status">
+                  <div class="auth-callout-text">
+                    <strong>No cloud API key configured yet.</strong>
+                    <span>Add an Anthropic, Gemini, DashScope, or local model endpoint to run turns.</span>
+                  </div>
+                  <button type="button" id="btn-landing-auth" class="primary-sm-btn">Configure API Keys</button>
+                </div>
+
+                <div class="starter-grid" aria-label="Quick prompts">
+                  <button type="button" class="starter-chip" data-prompt="Summarize the architecture and entry points of this workspace.">
+                    <span class="starter-title">Map this codebase</span>
+                    <span class="starter-desc">Inspect crates, modules, and entry points</span>
+                  </button>
+                  <button type="button" class="starter-chip" data-prompt="Run the test suite and report any failures or warnings with exact file paths.">
+                    <span class="starter-title">Check tests and lints</span>
+                    <span class="starter-desc">Verify current build health in sandbox</span>
+                  </button>
+                  <button type="button" class="starter-chip" data-prompt="Switch to read-only review and identify potential bugs or edge cases in recently modified files.">
+                    <span class="starter-title">Review recent changes</span>
+                    <span class="starter-desc">Read-only inspection of current diff</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Live transcript -->
+            <div id="transcript" class="transcript hidden" aria-live="polite"></div>
+          </div>
+
+          <!-- Steer queued notice -->
+          <div id="steer-banner" class="steer-banner hidden" role="status"></div>
+
+          <!-- Pending approval or ask_user card -->
+          <div id="decision-slot" class="decision-slot hidden" role="region" aria-label="Pending approval"></div>
+
+          <!-- Composer dock -->
+          <div class="composer-dock">
+            <div class="composer-wrap">
+              <!-- Inline slash command palette -->
+              <div id="slash-palette" class="slash-palette hidden" role="listbox" aria-label="Slash commands"></div>
+
+              <div class="composer-box" id="composer-box">
+                <label for="composer-input" class="sr-only">Prompt input</label>
+                <textarea
+                  id="composer-input"
+                  class="composer-input"
+                  rows="1"
+                  placeholder="Ask anything about this workspace, or type / for commands..."
+                  spellcheck="true"
+                ></textarea>
+
+                <!-- Strictly 4 composer footer controls matching Saint Quiet-Chrome contract -->
+                <div class="composer-footer">
+                  <div class="composer-footer-left">
+                    <button type="button" id="btn-mode" class="pill-btn" title="Switch Build or Plan mode (Shift+Tab)">
+                      <span id="mode-label">Build</span>
+                    </button>
+
+                    <button type="button" id="btn-access" class="pill-btn" aria-haspopup="dialog" aria-expanded="false" title="Runtime permission mode (Alt+A)">
+                      <span id="access-label">Ask for approval</span>
+                      <span class="caret" aria-hidden="true">▾</span>
+                    </button>
+                  </div>
+
+                  <div class="composer-footer-right">
+                    <span id="ctx-usage" class="ctx-label mono">0 / 110K</span>
+                    <button type="button" id="btn-stop" class="stop-btn hidden" title="Interrupt current turn">Stop</button>
+                    <button type="button" id="btn-send" class="send-btn" aria-label="Send prompt" title="Send (Enter)">
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <path d="M8 13V3M8 3L3.75 7.25M8 3L12.25 7.25" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <!-- Right Split Diff Drawer (progressive disclosure) -->
+      <aside id="diff-drawer" class="diff-drawer hidden" aria-label="Workspace diff">
+        <div class="drawer-header">
+          <div class="drawer-title-group">
+            <h2 class="drawer-title">Workspace Diff</h2>
+            <span id="diff-branch" class="mono drawer-meta"></span>
+          </div>
+          <div class="drawer-actions">
+            <button type="button" id="btn-diff-refresh" class="tb-btn">Refresh</button>
+            <button type="button" id="btn-diff-close" class="tb-btn" aria-label="Close diff drawer">Close</button>
+          </div>
+        </div>
+        <div id="diff-body" class="diff-body">
+          <div class="empty-state">No changes loaded yet.</div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Floating Popovers & Modals (top-down Esc stack) -->
+
+    <!-- Model Picker Popover -->
+    <div id="model-popover" class="popover hidden" role="dialog" aria-modal="true" aria-labelledby="model-popover-title">
+      <div class="popover-head">
+        <h2 id="model-popover-title" class="popover-title">Cross-model handoff</h2>
+        <button type="button" class="tb-btn" data-close-overlay="model">Esc</button>
+      </div>
+      <div id="model-popover-body" class="popover-list"></div>
+    </div>
+
+    <!-- Runtime Access Mode Popover -->
+    <div id="access-popover" class="popover popover-bottom hidden" role="dialog" aria-modal="true" aria-labelledby="access-popover-title">
+      <div class="popover-head">
+        <h2 id="access-popover-title" class="popover-title">Runtime access</h2>
+        <button type="button" class="tb-btn" data-close-overlay="access">Esc</button>
+      </div>
+      <div id="access-popover-body" class="popover-list"></div>
+    </div>
+
+    <!-- Cache & Cost Popover -->
+    <div id="cache-popover" class="popover hidden" role="dialog" aria-modal="true" aria-labelledby="cache-popover-title">
+      <div class="popover-head">
+        <h2 id="cache-popover-title" class="popover-title">Prompt cache and session usage</h2>
+        <button type="button" class="tb-btn" data-close-overlay="cache">Esc</button>
+      </div>
+      <div id="cache-popover-body" class="cache-details"></div>
+    </div>
+
+    <!-- /btw Ephemeral Sidechat Sheet -->
+    <div id="btw-sheet" class="popover btw-sheet hidden" role="dialog" aria-modal="true" aria-labelledby="btw-title">
+      <div class="popover-head">
+        <h2 id="btw-title" class="popover-title">Sidechat (/btw, does not mutate session history)</h2>
+        <button type="button" class="tb-btn" data-close-overlay="btw">Esc</button>
+      </div>
+      <div id="btw-output" class="btw-output">Ask a quick read-only question about this session.</div>
+      <form id="btw-form" class="btw-form">
+        <label for="btw-input" class="sr-only">Sidechat question</label>
+        <input id="btw-input" type="text" class="text-input" placeholder="Ask without polluting session history..." autocomplete="off" />
+        <button type="submit" class="primary-sm-btn">Ask</button>
+      </form>
+    </div>
+
+    <!-- Session DAG Tree Modal -->
+    <div id="tree-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="tree-modal-title">
+      <div class="modal-card">
+        <div class="modal-head">
+          <div>
+            <h2 id="tree-modal-title" class="modal-title">Session branch tree</h2>
+            <p class="modal-sub">Inspect messages in this session and fork from any turn.</p>
+          </div>
+          <button type="button" class="tb-btn" data-close-overlay="tree">Close</button>
+        </div>
+        <div id="tree-modal-body" class="modal-body"></div>
+        <div class="modal-foot">
+          <button type="button" id="btn-fork-head" class="primary-sm-btn">Fork from latest turn</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Provider API Keys & Settings Modal -->
+    <div id="settings-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+      <div class="modal-card modal-wide">
+        <div class="modal-head">
+          <div>
+            <h2 id="settings-modal-title" class="modal-title">API Keys and Provider Endpoints</h2>
+            <p id="settings-path-meta" class="modal-sub mono">Stored locally in ~/.saint-harness/settings.json (chmod 0600).</p>
+          </div>
+          <button type="button" class="tb-btn" data-close-overlay="settings">Close</button>
+        </div>
+
+        <div class="modal-body settings-layout">
+          <div id="provider-list" class="provider-list" role="tablist" aria-label="Providers"></div>
+
+          <form id="provider-form" class="provider-form">
+            <div class="form-header">
+              <h3 id="pf-title" class="pf-title">Anthropic (Claude)</h3>
+              <span id="pf-status-badge" class="status-pill">Not configured</span>
+            </div>
+
+            <div class="field-row">
+              <label for="pf-api-key" class="field-label">
+                API Key <span id="pf-env-name" class="mono muted"></span>
+              </label>
+              <input
+                id="pf-api-key"
+                type="password"
+                class="text-input mono"
+                placeholder="Paste provider API key (leave empty to keep existing key)"
+                autocomplete="off"
+              />
+              <p id="pf-preview-hint" class="field-hint mono"></p>
+            </div>
+
+            <div class="field-row">
+              <label for="pf-base-url" class="field-label">Base URL (optional custom gateway or local server)</label>
+              <input
+                id="pf-base-url"
+                type="url"
+                class="text-input mono"
+                placeholder="https://api.anthropic.com"
+                autocomplete="off"
+              />
+            </div>
+
+            <label class="checkbox-row" for="pf-set-default">
+              <input id="pf-set-default" type="checkbox" />
+              <span>Use this provider's model profile as default for new sessions</span>
+            </label>
+
+            <div id="pf-feedback" class="form-feedback hidden" role="status"></div>
+
+            <div class="form-actions">
+              <button type="submit" id="btn-pf-save" class="primary-sm-btn">Save key</button>
+              <button type="button" id="btn-pf-test" class="secondary-sm-btn">Test connection</button>
+              <button type="button" id="btn-pf-remove" class="danger-sm-btn">Remove key</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live screen-reader announcer -->
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+  </div>
+
+  <script src="./app.js" defer></script>
+</body>
+</html>

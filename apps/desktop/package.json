@@ -1,0 +1,16 @@
+{
+  "name": "saint-harness-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SaintHarness native desktop application powered by Tauri v2 and embedded saint-harness-server",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:deb": "tauri build --bundles deb",
+    "build:appimage": "tauri build --bundles appimage"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.5.0"
+  }
+}

@@ -1,0 +1,33 @@
+[package]
+name = "saint-harness-desktop"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+description = "SaintHarness native desktop application"
+
+[workspace]
+
+[lib]
+name = "saint_harness_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+saint-harness-protocol = { path = "../../../crates/saint-harness-protocol" }
+saint-harness-schema = { path = "../../../crates/saint-harness-schema" }
+saint-harness-server = { path = "../../../crates/saint-harness-server" }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+ulid = { version = "1", features = ["serde"] }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

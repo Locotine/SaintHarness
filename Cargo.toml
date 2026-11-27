@@ -17,6 +17,7 @@ members = [
   "crates/saint-harness-acp",
   "crates/saint-harness-cli",
 ]
+exclude = ["apps/desktop/src-tauri"]
 
 [workspace.package]
 version = "0.1.0"

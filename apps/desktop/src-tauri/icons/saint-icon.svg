@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="#111111"/>
+  <rect x="64" y="64" width="896" height="896" rx="200" stroke="#2c2c2c" stroke-width="16"/>
+  <!-- Saint Ember Crown -->
+  <path d="M312 296L382 174L512 256L642 174L712 296H312Z" fill="#f2612d"/>
+  <rect x="342" y="318" width="340" height="40" rx="20" fill="#f2612d"/>
+  <!-- Shield -->
+  <path d="M256 416C256 400.5 268.5 388 284 388H740C755.5 388 768 400.5 768 416V576C768 726 651 826 512 878C373 826 256 726 256 576V416Z" stroke="#fcfcfc" stroke-width="44" fill="none"/>
+  <!-- S Ribbon -->
+  <path d="M604 502C604 472 572 454 516 454C458 454 420 479 420 513C420 549 456 565 515 576C575 588 612 606 612 648C612 688 570 717 506 717C448 717 409 694 404 657" stroke="#fcfcfc" stroke-width="44" stroke-linecap="round"/>
+</svg>
