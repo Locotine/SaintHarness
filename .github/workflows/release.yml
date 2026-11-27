@@ -276,6 +276,7 @@ jobs:
           path: dist
 
       - name: Install .deb via apt-get and run CLI smoke
+        shell: bash
         run: |
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
