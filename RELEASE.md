@@ -9,11 +9,11 @@ This document describes the versioning policy, cross-platform build matrix, Linu
 SaintHarness follows strict Semantic Versioning (`MAJOR.MINOR.PATCH`):
 
 - **Git tag format:** `vX.Y.Z` (for example, `v0.1.0`).
-- **Single source of truth:** `scripts/release/sync-version.py` validates strict SemVer and synchronizes the version string across all CLI and Desktop manifests:
-  - Root workspace `Cargo.toml` (`[workspace.package] version`)
+- **Single source of truth:** `scripts/release/sync-version.py` validates strict SemVer and synchronizes the version string across all CLI and Desktop manifests and lockfiles:
+  - Root workspace `Cargo.toml` (`[workspace.package] version`) and `Cargo.lock`
   - npm thin wrapper `packages/npm-cli/package.json` (`version`)
-  - Desktop wrapper `apps/desktop/package.json` (`version`)
-  - Desktop Rust crate `apps/desktop/src-tauri/Cargo.toml` (`[package] version`)
+  - Desktop wrapper `apps/desktop/package.json` (`version`) and `apps/desktop/package-lock.json`
+  - Desktop Rust crate `apps/desktop/src-tauri/Cargo.toml` (`[package] version`) and `apps/desktop/src-tauri/Cargo.lock`
   - Tauri v2 bundle config `apps/desktop/src-tauri/tauri.conf.json` (`version`)
 - **Automated enforcement:** The `preflight` job in `.github/workflows/release.yml` normalizes and validates the tag or `workflow_dispatch` input before any build runner starts.
 
@@ -156,7 +156,7 @@ Synchronize the version across Cargo, npm, and Tauri Desktop manifests, commit, 
 python3 scripts/release/sync-version.py --sync 0.2.0
 python3 scripts/release/sync-version.py --verify 0.2.0
 git status
-git add Cargo.toml packages/npm-cli/package.json apps/desktop/package.json apps/desktop/src-tauri/Cargo.toml apps/desktop/src-tauri/tauri.conf.json
+git add Cargo.toml Cargo.lock packages/npm-cli/package.json apps/desktop/package.json apps/desktop/package-lock.json apps/desktop/src-tauri/Cargo.toml apps/desktop/src-tauri/Cargo.lock apps/desktop/src-tauri/tauri.conf.json
 git commit -m "chore(release): prepare v0.2.0"
 git tag v0.2.0
 git push origin main --tags
@@ -266,7 +266,7 @@ Prefer a forward patch release (`vX.Y.(Z+1)`) over mutating published artifacts 
 
 | Script | Purpose |
 | :--- | :--- |
-| `scripts/release/sync-version.py` | Normalizes strict SemVer (`--normalize`), syncs (`--sync`), and verifies (`--verify`) all 5 manifests (`Cargo.toml`, `packages/npm-cli/package.json`, `apps/desktop/package.json`, `apps/desktop/src-tauri/Cargo.toml`, `apps/desktop/src-tauri/tauri.conf.json`). |
+| `scripts/release/sync-version.py` | Normalizes strict SemVer (`--normalize`), syncs (`--sync`), and verifies (`--verify`) all manifests and lockfiles (`Cargo.toml`, `Cargo.lock`, npm wrapper, Tauri Desktop manifests, `apps/desktop/package-lock.json`, and `apps/desktop/src-tauri/Cargo.lock`). |
 | `scripts/release/build-deb.sh` | Builds CLI `amd64`/`arm64` `.deb` packages, enforces `GLIBC <= 2.35`, rejects `*t64*` deps, and checks package layout. |
 | `scripts/release/generate-manifest.py` | Computes `SHA256SUMS.txt` and `release-manifest.json` (`platforms` + optional `desktop`); fails closed if any of the 7 CLI bundles or (with `--require-desktop`) 5 Desktop installers is missing. |
 | `scripts/release/generate-package-manifests.py` | Generates `saint-harness.rb`, `saint-harness.scoop.json`, and WinGet YAML manifests from `release-manifest.json`. |

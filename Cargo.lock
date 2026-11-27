@@ -3948,7 +3948,7 @@ checksum = "9774ba4a74de5f7b1c1451ed6cd5285a32eddb5cccb8cc655a4e50009e06477f"
 
 [[package]]
 name = "saint-harness-acp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "saint-harness-core",
  "saint-harness-schema",
@@ -3962,7 +3962,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-ai"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -3981,7 +3981,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "axum",
  "clap",
@@ -4004,7 +4004,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-codemode"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "oxc_allocator",
@@ -4023,7 +4023,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -4055,7 +4055,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-edit"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ast-grep-core",
  "async-trait",
@@ -4078,7 +4078,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-index"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "ignore",
@@ -4090,7 +4090,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-lsp"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "dashmap",
@@ -4109,7 +4109,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-protocol"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4117,7 +4117,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-schema"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "futures",
@@ -4131,7 +4131,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-server"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "axum",
  "dashmap",
@@ -4158,7 +4158,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-shell"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "dashmap",
@@ -4174,7 +4174,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-token"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "blake3",
  "chrono",
@@ -4193,7 +4193,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-treesitter"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ignore",
  "saint-harness-schema",
@@ -4210,7 +4210,7 @@ dependencies = [
 
 [[package]]
 name = "saint-harness-tui"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "crossterm",
  "eventsource-stream",

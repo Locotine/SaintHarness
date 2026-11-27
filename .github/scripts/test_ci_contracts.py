@@ -231,22 +231,46 @@ class TestCiContracts(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "Cargo.toml").write_text('[workspace.package]\nversion = "0.1.0"\n', encoding="utf-8")
+            (root / "Cargo.lock").write_text(
+                'version = 4\n\n'
+                '[[package]]\nname = "saint-harness-core"\nversion = "0.1.0"\n\n'
+                '[[package]]\nname = "serde"\nversion = "1.0.219"\nsource = "registry+https://github.com/rust-lang/crates.io-index"\n',
+                encoding="utf-8",
+            )
             (root / "packages/npm-cli").mkdir(parents=True)
             (root / "packages/npm-cli/package.json").write_text('{"name":"@saintharness/cli","version":"0.1.0"}\n', encoding="utf-8")
             (root / "apps/desktop/src-tauri").mkdir(parents=True)
             (root / "apps/desktop/package.json").write_text('{"name":"saint-harness-desktop","version":"0.1.0"}\n', encoding="utf-8")
+            (root / "apps/desktop/package-lock.json").write_text(
+                '{"name":"saint-harness-desktop","version":"0.1.0","packages":{"":{"name":"saint-harness-desktop","version":"0.1.0"}}}\n',
+                encoding="utf-8",
+            )
             (root / "apps/desktop/src-tauri/Cargo.toml").write_text('[package]\nname = "saint-harness-desktop"\nversion = "0.1.0"\n', encoding="utf-8")
+            (root / "apps/desktop/src-tauri/Cargo.lock").write_text(
+                'version = 4\n\n[[package]]\nname = "saint-harness-desktop"\nversion = "0.1.0"\n',
+                encoding="utf-8",
+            )
             (root / "apps/desktop/src-tauri/tauri.conf.json").write_text('{"productName":"SaintHarness","version":"0.1.0"}\n', encoding="utf-8")
 
             self.assertEqual(mod.sync_workspace_version("v0.2.5", root), "0.2.5")
             self.assertEqual(mod.verify_all_versions("0.2.5", root), "0.2.5")
+            self.assertIn('version = "0.2.5"', (root / "Cargo.lock").read_text(encoding="utf-8"))
+            self.assertIn('version = "1.0.219"', (root / "Cargo.lock").read_text(encoding="utf-8"))
             self.assertIn('version = "0.2.5"', (root / "apps/desktop/src-tauri/Cargo.toml").read_text(encoding="utf-8"))
+            self.assertIn('version = "0.2.5"', (root / "apps/desktop/src-tauri/Cargo.lock").read_text(encoding="utf-8"))
             self.assertEqual(json.loads((root / "apps/desktop/src-tauri/tauri.conf.json").read_text(encoding="utf-8"))["version"], "0.2.5")
+            pkg_lock = json.loads((root / "apps/desktop/package-lock.json").read_text(encoding="utf-8"))
+            self.assertEqual(pkg_lock["version"], "0.2.5")
+            self.assertEqual(pkg_lock["packages"][""]["version"], "0.2.5")
 
-            # Drift in desktop manifest must fail --verify
-            (root / "apps/desktop/package.json").write_text('{"name":"saint-harness-desktop","version":"0.1.0"}\n', encoding="utf-8")
+            # Drift in Cargo.lock must fail --verify (catches --locked CI failures early)
+            (root / "Cargo.lock").write_text('version = 4\n\n[[package]]\nname = "saint-harness-core"\nversion = "0.1.0"\n', encoding="utf-8")
             with self.assertRaises(ValueError):
                 mod.verify_all_versions("0.2.5", root)
+
+            # Live repository manifests and lockfiles must always stay in sync
+            live_version = mod.read_workspace_version(ROOT / "Cargo.toml")
+            self.assertEqual(mod.verify_all_versions(live_version, ROOT), live_version)
 
     def test_generate_manifest_fails_closed_on_missing_and_writes_all_platforms(self) -> None:
         mod = load_module("generate_manifest", ROOT / "scripts/release/generate-manifest.py")
